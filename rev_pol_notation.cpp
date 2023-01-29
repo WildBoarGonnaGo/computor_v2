@@ -153,7 +153,13 @@ public:
 			//Проверяем на то номер это или нет
 			if (std::isdigit(c) || c == '.') {
 				std::string number = GetStringNumber(i);
+				//Заносим в стэк преобразованную в Double строку
 				nums.push(std::stod(number));
+			}
+			// Если символ есть в списке операторов
+			else if (auto search = operPriority.find(c); search != operPriority.end()) {
+				//Проверяем, является ли данный оператор унарным
+
 			}
 		}
 	}
