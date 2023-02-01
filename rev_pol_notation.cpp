@@ -4,6 +4,7 @@
 #include <cctype>
 #include <stack>
 #include <cmath>
+#include <vector>
 
 class RevPolNotation {
 	std::string			inifixExpr;
@@ -25,6 +26,7 @@ class RevPolNotation {
 		}
 		//Сдвигаем каретку
 		--i;
+		if (!res.compare(".")) res.clear();
 		return res;
 	}
 
@@ -37,6 +39,15 @@ class RevPolNotation {
 		else if (!oper.compare("/")) return f / s;
 		else if (!oper.compare("^")) return std::pow(f, s);
 		else return 0;
+	}
+
+	double funcExecute(const std::string &oper, const double &var) {
+		if (!oper.compare("sin")) return std::sin(var);
+		else if (!oper.compare("cos")) return std::cos(var);
+		else if (!oper.compare("tan")) return std::tan(var);
+		else if (!oper.compare("exp")) return std::exp(var);
+		else if (!oper.compare("sqrt")) return std::sqrt(var);
+		return 0;
 	}
 
 	std::string		ProcessPostfix() {
@@ -53,7 +64,7 @@ class RevPolNotation {
 		//Перебираем строку
 		for (int i = 0; i < inifixExpr.size(); ++i) {
 			//Если символ - число
-			if (std::isdigit(inifixExpr[i])) {
+			if (std::isdigit(inifixExpr[i]) || inifixExpr[i] == '.') {
 				if (!number) number = true;
 				else {
 					std::cerr << "wrong order: there should be number" << std::endl;
@@ -94,10 +105,34 @@ class RevPolNotation {
 				std::string	tmp;
 				while (std::isalpha(inifixExpr[i]))
 					tmp.push_back(inifixExpr[i++]);
+
 				//Сдвигаем каретку назад, если были буквы
 				//Если их не было, значит перед нами бинарный оператор
-				//и его следует добавить в tmp
-				if (inifixExpr[i] != c) --i;
+				//и его следует добавить в tmp. Если были буквы, то
+				//проверяем что перед нами функция и проверяем также, чтобы
+				//были открывающиеся скобки
+				if (inifixExpr[i] != c) {
+					//Ищем функцию среди строк
+					auto search = operPriority.find(tmp);
+					//Пропускаем пробельные символы
+					while (std::isspace(inifixExpr[i])) ++i;
+					//Если у нас число pi, то проверяем очередность операторов
+					if (!number && !tmp.compare("pi")) {
+						number = true;
+						res += std::to_string(M_PI) + " ";
+						--i;
+						continue ;
+					}
+					//Если функция присутствует и следующий символ - октрывающая скобка
+					//то мы функцию заносим в стэк операторов, в противном случае
+					//выводится ошибка и возвращается пустая строка
+					else if (search != operPriority.end() && inifixExpr[i] == '(') {
+						oper.push(tmp); --i; continue ;
+					} else {
+						std::cerr << "error: there should be open brace after function name" << std::endl;
+						res.clear(); return res;
+					}
+				}
 				else tmp.push_back(c);
 				//Проверка является ли оператор унарным минусом
 				if (!number && !tmp.compare("-") && !std::isspace(inifixExpr[i + 1])) {
@@ -137,7 +172,12 @@ public:
 		operPriority["*"] = 2;
 		operPriority["/"] = 2;
 		operPriority["^"] = 3;
-		operPriority["~"] = 4;
+		operPriority["sin"] = 4;
+		operPriority["cos"] = 4;
+		operPriority["tan"] = 4;
+		operPriority["exp"] = 4;
+		operPriority["sqrt"] = 4;
+		operPriority["~"] = 5;
 
 		inifixExpr = std::move(init_expr);
 		postfixExpr = ProcessPostfix();
@@ -157,31 +197,36 @@ public:
 		double					res;
 		//Строка состоящая из бинарных операторов
 		std::string				opers("+ / - * ^");
+		//Список функций
+		std::vector<std::string> funcs = { "sin", "cos", "tan", "exp", "sqrt" };
+		//Парсер-каретка
+		std::string parser;
 
 		//Проходим по строке
 		for (int i = 0; i < postfixExpr.length(); ++i) {
 			//Берем значение символа
-			char c = postfixExpr[i];
+			//char c = postfixExpr[i];
+			parser.push_back(postfixExpr[i]);
 			//Проверяем на то номер это или нет
-			if (std::isdigit(c) || c == '.') {
+			if (std::isdigit(postfixExpr[i]) || postfixExpr[i] == '.') {
+				parser.clear();
 				std::string number = GetStringNumber(postfixExpr, i);
 				//Заносим в стэк преобразованную в Double строку
 				nums.push(std::stod(number));
 			}
+			// если строка есть в спике функций
+			else if (funcs.find(parser) != std::string::npos) {
+				//Проверяем пуст ли стэк, если да то задаем нулевое значение
+				//если нет, то выталкиваем значение из стэка
+				double tmp = (nums.empty()) ? 0 : nums.top();
+				if (!nums.empty()) nums.pop();
+				nums.push(funcExecute(parser, tmp));
+				parser.clear();
+			}
 			// Если символ есть в списке операторов
-			//else if (auto search = operPriority.find(c); search != operPriority.end()) {
-			else if (std::isalpha(c) || opers.find(c) != std::string::npos) {
-				//формируем строку
-				std::string execStr;
-				while (std::isalpha(postfixExpr[i]))
-					execStr.push_back(postfixExpr[i++]);
-				//Сдвигаем каретку назад, если были буквы
-				//Если их не было, значит перед нами бинарный оператор
-				//и его следует добавить в execStr
-				if (postfixExpr[i] != c) --i;
-				else execStr.push_back(c);
+			else if (opers.find(parser) != std::string::npos) {
 				//Проверяем, является ли данный оператор унарным
-				if (!execStr.compare("~")) {
+				if (!parser.compare("~")) {
 					//Проверяем пуст ли стэк, если да, то задаем нулевое значение
 					//если нет, то выталкиваем значение из стэка
 					double tmp = (nums.empty()) ? 0 : nums.top();
@@ -189,8 +234,10 @@ public:
 					//Вставляем новое значение в стэк
 					nums.push(Execute("-", 0, tmp));
 					//Переходим к следующей итерации цикла
+					parser.clear();
 					continue ;
 				}
+
 				//Обозначем переменные для подсчета
 				double first, second;
 				//Получаем значение стэка в обратном порядке
@@ -200,7 +247,8 @@ public:
 				if (!nums.empty()) { first = nums.top(); nums.pop(); }
 				else first = 0;
 				//Получаем результат операций и заносим в стэк
-				nums.push(Execute(execStr, first, second));
+				nums.push(Execute(parser, first, second));
+				parser.clear();
 			}
 			//пропускаем пробельные символы
 			while (std::isspace(postfixExpr[i + 1])) ++i;
@@ -312,6 +360,18 @@ int main(void) {
 
 	revpol.setInfixExpr("15/(7-(1+1))*3-(2+(1+1))*15/(7-(200+1))*3-(2+(1+1))*(15/(7-(1+1))*3-(2+(1+1))+15/(7-(1+1))*3-(2+(1+1)))");
 	std::cout << "Test 13:" << std::endl;
+	std::cout << "Infix notation: " << revpol.getInifixExpr() << std::endl;
+	std::cout << "Postfix notation: " << revpol.getPosfixExpr() << std::endl;
+	std::cout << "Operation result: " << revpol.CalcIt() << std::endl << std::endl;
+
+	revpol.setInfixExpr("pi");
+	std::cout << "Test 14:" << std::endl;
+	std::cout << "Infix notation: " << revpol.getInifixExpr() << std::endl;
+	std::cout << "Postfix notation: " << revpol.getPosfixExpr() << std::endl;
+	std::cout << "Operation result: " << revpol.CalcIt() << std::endl << std::endl;
+
+	revpol.setInfixExpr("sin(pi)");
+	std::cout << "Test 14:" << std::endl;
 	std::cout << "Infix notation: " << revpol.getInifixExpr() << std::endl;
 	std::cout << "Postfix notation: " << revpol.getPosfixExpr() << std::endl;
 	std::cout << "Operation result: " << revpol.CalcIt() << std::endl << std::endl;
