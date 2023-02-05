@@ -6,6 +6,7 @@
 #include <cmath>
 #include <set>
 #include <algorithm>
+#include <list>
 
 class RevPolNotation {
 	std::string			inifixExpr;
@@ -31,8 +32,120 @@ class RevPolNotation {
 		return res;
 	}
 
+	//Анализатор строки для знаменателя которая
+	//возвращает список складываемых и вычитаемых элементов
+	std::list<std::string> DenomElems(const std::string &src) {
+		std::list<std::string> res;
+		std::string elem;
+		int ghost = 0;
+		std::set<std::string> funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
+
+		for (int i = 0; i < src.length(); ++i) {
+			elem.push_back(src[i]);
+			if (auto search = funcs.find(elem); search != funcs.end() || src[i] == '(') ++ghost;
+			else if (src[i] == ')') --ghost;
+			else if (src[i] == '+' || src[i] == '-' && !ghost) {
+				int tmp = elem.size() - 1;
+
+				while (std::isspace(elem[tmp])) --tmp;
+				elem = elem.substr(0, tmp + 1);
+				res.push_back(elem);
+				elem.clear();
+				elem.push_back(src[i]);
+				res.push_back(elem);
+				elem.clear();
+			}
+		}
+		if (!elem.empty()) res.push_back(elem);
+		return res;
+	}
+
+	//Complex sum and subtraction of string and number
+	void ComplexSumSubtract(std::list<std::string> &elems, const std::string &num,
+							const std::string &oper) {
+		std::list<std::string>::iterator it = elems.begin();
+		std::string finalNum;
+
+		for ( ; it != elems.begin(); ++it) {
+			if ((*it).find_first_not_of("-0123456789.") == std::string::npos) {
+				if (it != elems.begin()) {
+					std::string auxOper = *(--it);
+
+				}
+			}
+		}
+	}
+
+	//Complex multiply or division of string and number
+	void ComplexMultiDiv(std::list<std::string> &elems, const std::string &num,
+								const std::string &oper) {
+		std::list<std::string>::iterator it = elems.begin();
+
+		for (; it != elems.end(); ++it) {
+			if ((*it).compare("-") && (*it).compare("+")) {
+				std::string strNum, strAlpha;
+				std::list<std::string> tmpList;
+				std::string strPart;
+
+				strNum = (*it).substr(0, (*it).find_first_not_of("-0123456789."));
+				strAlpha = (*it).substr((*it).find_first_not_of("-0123456789."));
+				strNum = RemoveTrailZeros(Execute(oper, strNum, num));
+				*it = strNum + ((strAlpha[0] == ' ') ? "" : " ") + strAlpha;
+			}
+		}
+	}
+
+	//Приватный подметод для выполнения операторов в случае
+	//если первый операнд - не число, а второе - число
+	std::string AlphaNum(const std::string &oper, const std::string &f, const std::string &s) {
+		std::string strFirstNum, strSecondNum;
+		double fNum, sNum, res;
+		std::string strRes;
+
+		strFirstNum = f.substr(0, f.find_first_not_of("-0123456789."));
+		strSecondNum = f.substr(f.find_first_not_of("-0123456789."));
+		if (strFirstNum.empty()) strFirstNum.push_back('1');
+		fNum = std::stod(strFirstNum);
+		sNum = std::stod(s);
+		if (!oper.compare("*") || !oper.compare("/")) {
+			std::list<std::string> lst = DenomElems(strSecondNum);
+			ComplexMultiDiv(lst, s, oper);
+			for (std::string elem : lst) strRes += elem + ((elem.compare(lst.back()) ? " " : ""));
+			return strRes;
+		}
+		else if (!oper.compare("+") || !oper.compare("^"))
+			return s + " " + oper + " " + f;
+		else if (!oper.compare("-")) {
+			sNum = -1 * std::stod(s);
+			return RemoveTrailZeros(std::to_string(sNum)) + " " + oper + " " + f;
+		}
+	}
+
+	//Приватный подметод для выполнения операторов в случае
+	//если первый операнд - число, а второе - не число
+	std::string NumAlpha(const std::string &oper, const std::string &f, const std::string &s) {
+		std::string strFirstNum, strSecondNum;
+		double fNum, sNum, res = 0;
+
+		strSecondNum = s.substr(0, s.find_first_not_of("-0123456789."));
+		strFirstNum = s.substr(s.find_first_not_of("-0123456789."));
+		if (strSecondNum.empty()) strSecondNum.push_back('1');
+		fNum = std::stod(f);
+		sNum = std::stod(strSecondNum);
+		if (!oper.compare("*")) {
+			res = fNum * sNum;
+			return RemoveTrailZeros(std::to_string(res)) + " " + oper + " " + strFirstNum;
+		} else if (!oper.compare("/")) {
+			res = fNum / sNum;
+			return RemoveTrailZeros(std::to_string(res)) + " " + oper + " " + strFirstNum;
+		} else return f + " " + oper + " " + s;
+	}
+
 	//Приватный метод для выполнения операторов
 	std::string Execute(const std::string &oper, const std::string &f, const std::string &s) {
+		//std::string test = "52.38428dsfaeafsfz23123123";
+		//std::cout << test.substr(0, test.find_first_not_of("0123456789.")) << std::endl;
+		std::string strFirstNum, strSecondNum;
 		double fNum, sNum, res = 0;
 		bool ifAlphaFirst, ifAlphaSecond;
 		auto ifAlpha = [](const char &c) { return std::isalpha(c); };
@@ -40,8 +153,11 @@ class RevPolNotation {
 		ifAlphaFirst = std::find_if(f.begin(), f.end(), ifAlpha) != f.end();
 		ifAlphaSecond = std::find_if(s.begin(), s.end(), ifAlpha) != s.end();
 
-
-		if (ifAlphaFirst && ifAlphaSecond) return f + " " + oper + " " + s;
+		if (ifAlphaFirst && !ifAlphaSecond)
+			return AlphaNum(oper, f, s);
+		else if (!ifAlphaFirst && ifAlphaSecond)
+			return NumAlpha(oper, f, s);
+		if (ifAlphaFirst || ifAlphaSecond) return f + " " + oper + " " + s;
 		fNum = std::stod(f);
 		sNum = std::stod(s);
 
@@ -456,11 +572,11 @@ int main(void) {
 	std::cout << "Postfix notation: " << revpol.getPosfixExpr() << std::endl;
 	std::cout << "Operation result: " << revpol.CalcIt() << std::endl << std::endl;
 
-	revpol.setInfixExpr("2 * i + i * (3 * (3 + 2)) + 1 + 9 + 11");
+	revpol.setInfixExpr("2 * i + i * (3 * (3 + 2)) + 1 + 9 * 11 + 12 * 24^2");
 	std::cout << "Test 18:" << std::endl;
 	std::cout << "Infix notation: " << revpol.getInifixExpr() << std::endl;
 	std::cout << "Postfix notation: " << revpol.getPosfixExpr() << std::endl;
-	//std::cout << "Operation result: " << revpol.CalcIt() << std::endl << std::endl;
+	std::cout << "Operation result: " << revpol.CalcIt() << std::endl << std::endl;
 
 	//std::string test = "52.38428dsfaeafsfz23123123";
 	//std::cout << test.substr(0, test.find_first_not_of("0123456789.")) << std::endl;
