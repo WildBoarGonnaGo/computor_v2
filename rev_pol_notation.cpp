@@ -61,23 +61,32 @@ class RevPolNotation {
 	}
 
 	//Complex sum and subtraction of string and number
-	void ComplexSumSubtract(std::list<std::string> &elems, const std::string &num,
+	void ComplexSumSubtractNum(std::list<std::string> &elems, const std::string &num,
 							const std::string &oper) {
 		std::list<std::string>::iterator it = elems.begin();
-		std::string finalNum;
+		std::string finalNum = "0";
 
-		for ( ; it != elems.begin(); ++it) {
+		while (it != elems.begin()) {
 			if ((*it).find_first_not_of("-0123456789.") == std::string::npos) {
 				if (it != elems.begin()) {
-					std::string auxOper = *(--it);
-
+					--it;
+					std::string auxOper = *it;
+					it = elems.erase(it);
+					finalNum = RemoveTrailZeros(Execute(auxOper, finalNum, *it));
+					elems.erase(it);
+					continue ;
 				}
+				finalNum = *it;
 			}
+			++it;
 		}
+		finalNum = RemoveTrailZeros(Execute(oper, finalNum, num));
+		elems.push_back((std::stod(finalNum) >= 0) ? "+" : "-");
+		elems.push_back(finalNum);
 	}
 
 	//Complex multiply or division of string and number
-	void ComplexMultiDiv(std::list<std::string> &elems, const std::string &num,
+	void ComplexMultiDivNum(std::list<std::string> &elems, const std::string &num,
 								const std::string &oper) {
 		std::list<std::string>::iterator it = elems.begin();
 
@@ -98,27 +107,22 @@ class RevPolNotation {
 	//Приватный подметод для выполнения операторов в случае
 	//если первый операнд - не число, а второе - число
 	std::string AlphaNum(const std::string &oper, const std::string &f, const std::string &s) {
-		std::string strFirstNum, strSecondNum;
-		double fNum, sNum, res;
 		std::string strRes;
+		std::list<std::string> lst = DenomElems(f);
 
-		strFirstNum = f.substr(0, f.find_first_not_of("-0123456789."));
-		strSecondNum = f.substr(f.find_first_not_of("-0123456789."));
-		if (strFirstNum.empty()) strFirstNum.push_back('1');
-		fNum = std::stod(strFirstNum);
-		sNum = std::stod(s);
 		if (!oper.compare("*") || !oper.compare("/")) {
-			std::list<std::string> lst = DenomElems(strSecondNum);
-			ComplexMultiDiv(lst, s, oper);
+			ComplexMultiDivNum(lst, s, oper);
 			for (std::string elem : lst) strRes += elem + ((elem.compare(lst.back()) ? " " : ""));
-			return strRes;
 		}
-		else if (!oper.compare("+") || !oper.compare("^"))
-			return s + " " + oper + " " + f;
-		else if (!oper.compare("-")) {
-			sNum = -1 * std::stod(s);
-			return RemoveTrailZeros(std::to_string(sNum)) + " " + oper + " " + f;
+		else if (!oper.compare("-") || !oper.compare("+")) {
+			ComplexSumSubtractNum(lst, s, oper);
+			for (std::string elem : lst) strRes += elem + ((elem.compare(lst.back()) ? " " : ""));
 		}
+		else if (!oper.compare("^")) {
+			bool brace = (lst.size() == 1);
+			strRes = ((brace) ? "(" : "") + f + ((brace) ? "(" : "") + " " + oper + " " + s;
+		}
+		return strRes;
 	}
 
 	//Приватный подметод для выполнения операторов в случае
@@ -139,6 +143,11 @@ class RevPolNotation {
 			res = fNum / sNum;
 			return RemoveTrailZeros(std::to_string(res)) + " " + oper + " " + strFirstNum;
 		} else return f + " " + oper + " " + s;
+	}
+
+	//Private method. It manages case with both alphanumerical variables
+	std::string AlphaAlpha(const std::string &oper, const std::string &f, const std::string &s) {
+
 	}
 
 	//Приватный метод для выполнения операторов
