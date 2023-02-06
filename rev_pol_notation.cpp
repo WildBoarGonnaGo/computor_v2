@@ -85,6 +85,8 @@ class RevPolNotation {
 		elems.push_back(finalNum);
 	}
 
+	//
+
 	//Complex multiply or division of string and number
 	void ComplexMultiDivNum(std::list<std::string> &elems, const std::string &num,
 								const std::string &oper) {
@@ -98,8 +100,14 @@ class RevPolNotation {
 
 				strNum = (*it).substr(0, (*it).find_first_not_of("-0123456789."));
 				strAlpha = (*it).substr((*it).find_first_not_of("-0123456789."));
+				if (!strNum.compare("-")) strNum = "-1";
+				else if (strNum.empty()) strNum = "1";
 				strNum = RemoveTrailZeros(Execute(oper, strNum, num));
-				*it = strNum + ((strAlpha[0] == ' ') ? "" : " ") + strAlpha;
+				if (!strNum.compare("-1") || !strNum.compare("1")) {
+					strNum.pop_back();
+					*it = strNum + strAlpha.substr(strAlpha.find_first_not_of("/* "));
+				}
+				else *it = strNum + ((strAlpha[0] == ' ') ? "" : " ") + strAlpha;
 			}
 		}
 	}
@@ -119,7 +127,7 @@ class RevPolNotation {
 			for (std::string elem : lst) strRes += elem + ((elem.compare(lst.back()) ? " " : ""));
 		}
 		else if (!oper.compare("^")) {
-			bool brace = (lst.size() == 1);
+			bool brace = (lst.size() != 1);
 			strRes = ((brace) ? "(" : "") + f + ((brace) ? "(" : "") + " " + oper + " " + s;
 		}
 		return strRes;
@@ -128,25 +136,68 @@ class RevPolNotation {
 	//Приватный подметод для выполнения операторов в случае
 	//если первый операнд - число, а второе - не число
 	std::string NumAlpha(const std::string &oper, const std::string &f, const std::string &s) {
-		std::string strFirstNum, strSecondNum;
-		double fNum, sNum, res = 0;
+		std::string strRes;
+		std::list<std::string> lst = DenomElems(s);
 
-		strSecondNum = s.substr(0, s.find_first_not_of("-0123456789."));
-		strFirstNum = s.substr(s.find_first_not_of("-0123456789."));
-		if (strSecondNum.empty()) strSecondNum.push_back('1');
-		fNum = std::stod(f);
-		sNum = std::stod(strSecondNum);
 		if (!oper.compare("*")) {
-			res = fNum * sNum;
-			return RemoveTrailZeros(std::to_string(res)) + " " + oper + " " + strFirstNum;
+			ComplexMultiDivNum(lst, f, oper);
+			for (std::string elem : lst) strRes += elem + ((elem.compare(lst.back()) ? " " : ""));
 		} else if (!oper.compare("/")) {
-			res = fNum / sNum;
-			return RemoveTrailZeros(std::to_string(res)) + " " + oper + " " + strFirstNum;
-		} else return f + " " + oper + " " + s;
+			if (lst.size() > 1) strRes = f + " / (" + s + ")";
+			else {
+				std::string strNum = s.substr(0, s.find_first_not_of("-0123456789."));
+				std::string strAlpha = s.substr(s.find_first_not_of("-0123456789."));
+				if (strNum.empty()) strNum = "1";
+				strNum = Execute(oper, f, strNum);
+				strRes = strNum + " / " + strAlpha;
+			}
+		}
+		return strRes;
 	}
 
-	//Private method. It manages case with both alphanumerical variables
+	//Private method. Number bracketing for complex equations
+	std::string NumBracketing(const std::list<std::string> &lst) {
+		std::string res;
+		std::list<double> nums;
+		std::list<std::string>::const_iterator it = lst.begin();
+
+		if (lst.size() == 1) return lst.front();
+		while (it != lst.end() && (*it).compare("+") && (*it).compare("-")) {
+			std::string tmp = (*it).substr(0, (*it).find_last_not_of("-0123456789."));
+			if (tmp.empty() || !tmp.compare("-")) tmp.push_back('1');
+
+			nums.push_back(std::stod(tmp));
+			++it;
+		}
+		std::sort(nums.begin(), nums.end());
+	}
+
+	//Private method. It manages multiplication and division of both alphanumerical variables
+	std::list<std::string> ComplexMultiDivAlpha(const std::string &oper,
+												const std::list<std::string> &fLst,
+												const std::list<std::string> &sLst) {
+		std::list<std::string> res;
+		std::list<std::string>::const_iterator itF;
+
+		if (!oper.compare("/")) {
+			std::string fNum, sNum, fAlpha, sAlpha;
+			if (fLst.size() > 1 || sLst.size() > 1) {
+
+			}
+		}
+		for (itF = fLst.begin(); itF != fLst.end(); ++itF) {
+			for (std::string sElem : sLst) {
+
+			}
+		}
+	}
+
+	//Private submethod. It manages case with both alphanumerical variables
 	std::string AlphaAlpha(const std::string &oper, const std::string &f, const std::string &s) {
+		std::list<std::string> fLst, sLst;
+
+		fLst = DenomElems(f);
+		sLst = DenomElems(s);
 
 	}
 
