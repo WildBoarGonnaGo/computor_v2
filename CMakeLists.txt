@@ -3,4 +3,5 @@ project(computor_v2)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(computor_v2 rev_pol_notation.cpp)
+add_executable(computor_v2 RevPolNotation.cpp EquationProc.cpp rev_pol_notation.cpp
+        computor.cpp Matrix.cpp MatrixCalc.cpp)
