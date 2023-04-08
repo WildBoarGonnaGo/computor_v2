@@ -470,7 +470,6 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			res.state = 3;
 			res.matrix.setToken(var.eq);
 			res.eq = oper + "(" + var.eq + ")";
-			return res;
 		}
 		//Search in regular function set
 		if (funcSearch != baseFuncsReg.end() || (search != funcs.end() && search->second.tokenIsMatrix == 2)) {
@@ -483,7 +482,6 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			}
 			res.state = 3;
 			res.matrix.setToken(var.eq);
-			return res;
 		}
 	}
 	//In case of basic matrix function
@@ -500,8 +498,6 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 		else if (*matrixSearch == "det") res = Det(var.matrix);
 		else if (*matrixSearch == "adj") res = Adj(var.matrix);
 		else if (*matrixSearch == "inv") res = Inv(var.matrix);
-
-		return res;
 	}
 	//In case of user defined function, that processes matricies
 	else if (search != funcs.end() && search->second.tokenIsMatrix == 1) {
@@ -522,14 +518,24 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			res.state = 4; return res;
 		}
 		res = subCalc.getFinValue();
-		return res;
 	}
 	//In other cases calculate it as a regular expression
 	else if (search != funcs.end() && search->second.tokenIsMatrix == 2) {
 		//Check is variable a regular expression, if it's not return error
 		if (var.state != 2) {
-
+			error = "error: " + oper + ": " + var.matrix.getMatrix() + "isn't a matrix";
+			res.state = 4; return res;
 		}
+		//Regular expression calculator
+		RevPolNotation pol(funcs);
+		pol.setInfixExpr(oper + "(" + var.eq + ")");
+		//if there was error, return it
+		if (!pol.getErrMsg().empty()) {
+			error = pol.getErrMsg();
+			res.state = 4; return res;
+		}
+		res.eq = pol.CalcIt();
+		res.state = 1;
 	}
 	//if (hasAlpha && search == userDefFuncs.end()) return oper + "(" + var + ")";
 	//else if (hasAlpha && search != userDefFuncs.end()) return UDfuncExpose(search->second, var);
@@ -554,6 +560,7 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 	else if (!oper.compare("exp")) res = std::expl(std::stold(var));
 	else if (!oper.compare("sqrt")) res = std::sqrtl(std::stold(var));
 	else if (!oper.compare("abs")) res = std::abs(std::stold(var));*/
+	return res;
 }
 
 //Return l1norm value result
