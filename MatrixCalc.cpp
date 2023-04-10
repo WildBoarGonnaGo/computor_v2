@@ -3,7 +3,6 @@
 //
 
 #include "MatrixCalc.h"
-#include <stack>
 #include <cmath>
 
 //Get double number from string
@@ -356,6 +355,8 @@ std::string MatrixCalc::CalcIt() {
 	std::string parser;
 	//reset calcError for recalculcations;
 	calcError = false;
+	//Lambda function. It calculate function result no matter
+	//if it's for matricies, regular expression or some user defined
 
 	//If there is already a calculated string or error
 	//return them
@@ -386,33 +387,68 @@ std::string MatrixCalc::CalcIt() {
 		//check if function is in the list of user defined strings
 		else if (auto search = funcs.find(it->eq); !it->state && search != funcs.end()) {
 			//Check if nums is empty, if it is, return error
-			if (nums.empty()) {
+			/*if (nums.empty()) {
 				error = "error: operands stack is empty";
 				calcResult.clear(); return calcResult;
 			}
 			value tmp = nums.top(); nums.pop();
-			nums.push(RemoveTrailZeros(funcExecute(parser, tmp)));
-			if (calcError) return nums.top();
-			parser.clear();
+			nums.push(funcExecute(it->eq, tmp));
+			//If there was some error return it
+			if (nums.top().state == 4) {
+				finCalc = nums.top(); calcResult.clear(); return "";
+			};
+			parser.clear();*/
+			if (funcExprExec(it->eq, nums).state == 4) return "";
 		}
-			//check function if string is in the list of functions
-		else if (auto search = funcs.find(parser); search != funcs.end() && !std::isalpha(postfixExpr[i + 1])) {
+		//Check if it's some base function operato
+		else if (auto search = baseFuncsMatrix.find(it->eq); !it->state && search != baseFuncsMatrix.end()) {
 			//Check whether stack is empty.  If there is none, we get zero value
 			//If there is some value we pop value from stack.
-			std::string tmp = (nums.empty()) ? 0 : nums.top();
+			/*std::string tmp = (nums.empty()) ? 0 : nums.top();
 			if (!nums.empty()) nums.pop();
 			nums.push(RemoveTrailZeros(funcExecute(parser, tmp)));
 			if (calcError) return nums.top();
-			parser.clear();
+			parser.clear();*/
+			//Check if nums is empty, if it is, return error
+			/*if (nums.empty()) {
+				error = "error: operands stack is empty";
+				calcResult.clear(); return calcResult;
+			}
+			value tmp = nums.top(); nums.pop();
+			nums.push(funcExecute(it->eq, tmp));
+			//If there was some error return it
+			if (nums.top().state == 4) {
+				finCalc = nums.top(); calcResult.clear(); return "";
+			}*/
+			if (funcExprExec(it->eq, nums).state == 4) return "";
+			//parser.clear();
 		}
-
-		else if (baseOpers.find(parser) != std::string::npos) {
+		else if (auto search = baseFuncsReg.find(it->eq); !it->state && search != baseFuncsReg.end()) {
+			//Check if nums is empty, if it is, return error
+			/*if (nums.empty()) {
+				error = "error: operands stack is empty";
+				calcResult.clear(); return calcResult;
+			}
+			value tmp = nums.top(); nums.pop();
+			nums.push(funcExecute(it->eq, tmp));
+			//If there was some error return it
+			if (nums.top().state == 4) {
+				finCalc = nums.top(); return "";
+			}*/
+			if (funcExprExec(it->eq, nums).state == 4) return "";
+			//parser.clear();
+		}
+		//Check if it's bas
+		else if (it->eq.size() == 1 && !it->state && baseOpers.find(it->eq) != std::string::npos) {
 			//Check if operator is unary
-			if (!parser.compare("~")) {
-				//Check whether stack is empty.  If there is none, we get zero value
-				//If there is some value we pop value from stack.
-				std::string tmp = (nums.empty()) ? "" : nums.top();
-				if (!nums.empty()) nums.pop();
+			if (it->eq == "~") {
+				//Check whether stack is empty.  If it's return error
+				//else pop it
+				if (nums.empty()) {
+					error = "error: '" + it->eq + "': operands stack is empty";
+					calcResult.clear(); finCalc.state = 4; return "";
+				}
+				value tmp = nums.top(); nums.pop();
 				//Push a new value into top of the stack
 				nums.push(RemoveTrailZeros(Execute("-", "0", tmp)));
 				//Onto next cycle iteration
@@ -435,7 +471,7 @@ std::string MatrixCalc::CalcIt() {
 			parser.clear();
 		}
 		//Passings whitespaces
-		while (std::isspace(postfixExpr[i + 1])) ++i;
+		//while (std::isspace(postfixExpr[i + 1])) ++i;
 	}
 	res = nums.top();
 	nums.pop();
@@ -882,6 +918,158 @@ std::string MatrixCalc::funcExpose(const Func &src, const std::string &forReplac
 		}
 		break ;
 	}
+	return res;
+}
+
+//Execute function block, no matter it's for matricies, regular expression
+//or it's some user defined
+MatrixCalc::value MatrixCalc::funcExprExec(const std::string &oper, std::stack<value> &nums) {
+	//Result value
+	value res;
+
+	if (nums.empty()) {
+		error = "error: '" + oper + "': operands stack is empty";
+		calcResult.clear(); res.state = 4; return res;
+	}
+	value tmp = nums.top(); nums.pop();
+	nums.push(funcExecute(oper, tmp));
+	//If there was some error return it
+	if (nums.top().state == 4) {
+		calcResult.clear();
+		finCalc = nums.top(); res.state = 4; return res;
+	}
+	res = nums.top();
+	return res;
+}
+
+//Execute some base operands between two values
+MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
+									  const value &first, const value &second) {
+	//Result value
+	value res;
+
+	//In case of first and second variables are matricies
+	if (first.state == 1 && second.state == 1) {
+		//in case of summing and subtract
+		if (oper == "+" || oper == "-") res = MatriciesSumSub(oper, first, second);
+		//in case of multiplication
+		else if (oper == "*") res = MatrixMulti(first.matrix, second.matrix);
+		//In case of division operation return error
+		else if (oper == "/") {
+			error = "error: '/': " + first.matrix.getMatrix() + ": "
+			+ second.matrix.getMatrix() + ": matricies division is not permitted";
+			res.state = 4;
+		}
+		//In case of power raising return error
+		else if (oper == "^") {
+			error = "error: '/': " + first.matrix.getMatrix() + ": "
+			+ second.matrix.getMatrix() + ": matricies power raise is not permitted";
+			res.state = 4;
+		}
+	}
+	//
+}
+//Matricies summing and subtract
+MatrixCalc::value MatrixCalc::MatriciesSumSub(const std::string &oper,
+											  const value &first, const value &second) {
+	//Result value
+	value res;
+
+	//Compare size of matricies. If their's sizes are not equal, return error
+	if (first.matrix.getRow() != second.matrix.getRow() &&
+			first.matrix.getRow() != second.matrix.getColumn()) {
+		error = "error: " + first.matrix.getMatrix() + " " +
+				oper + " " + second.matrix.getMatrix() + ": sizes are not equal";
+		calcResult.clear(); res.state = 4; return res;
+	}
+	//values of the first matrix
+	std::vector<std::string> fVal = first.matrix.getValues();
+	//values of the second matrix
+	std::vector<std::string> sVal = second.matrix.getValues();
+	//Row and column size
+	int row = first.matrix.getRow(); int column = second.matrix.getColumn();
+	//Result values vector and it's iterator
+	std::vector<std::string> resVal(row * column); int resIt = 0;
+	//Sum or operand matrix values
+	for (int i = 0; i < row * column; ++i) {
+		//Expression calculator
+		RevPolNotation calc(funcs);
+		calc.setToken(token);
+		//Set infix expression and calculate it
+		//in case of error return it
+		calc.setInfixExpr("(" + fVal[i] + ") " + oper + " (" + sVal[i] + ")");
+		if (!calc.getErrMsg().empty()) {
+			error = calc.getErrMsg();
+			res.state = 4; return res;
+		}
+		resVal[i] = calc.CalcIt();
+		if (!calc.getErrMsg().empty()) {
+			error = calc.getErrMsg();
+			res.state = 4; return res;
+		}
+	}
+	res.state = 1;
+	res.matrix = Matrix(resVal, row, column);
+	return res;
+}
+
+MatrixCalc::value MatrixCalc::MatrixSocketMultiply(const Matrix &f, const Matrix &s, int row, int column) {
+	//Result value
+	value res;
+
+	//Computing result
+	for (int i = 0; i < f.getColumn(); ++i)
+		res.eq += (res.eq.empty() ? "(" : " + (") + f.getValues()[row * f.getColumn() + i]
+				+ " * " + s.getValues()[i * s.getColumn() + column] + ")";
+	//Expression calculator. If there will be some due calculation
+	//error return it
+	RevPolNotation pol(funcs);
+	pol.setInfixExpr(std::move(res.eq));
+	pol.setToken(token);
+	if (!pol.getErrMsg().empty()) {
+		error = pol.getErrMsg();
+		res.state = 4; return res;
+	}
+	res.eq = pol.CalcIt();
+	if (!pol.getErrMsg().empty()) {
+		error = pol.getErrMsg();
+		res.state = 4; return res;
+	}
+	res.state = 2;
+	return res;
+}
+
+//Matricies multiplication
+MatrixCalc::value MatrixCalc::MatrixMulti(const Matrix &f, const Matrix &s) {
+	//Result value
+	 value res;
+
+	//if number of columns of 'f' matrix doesn't equal
+	//to number of rows of 's' matrix return error
+	//and return empty matrix
+	if (f.getColumn() != s.getRow()) {
+		error = "error: first matrix (" + f.getMatrix() + ") number of columns isn't equal\n"
+			+ "to number of rows of second matrix (" + s.getMatrix() + ")";
+		res.state = 4;
+	}
+	//Number of rows and columns of result matrix
+	int row = f.getRow(), column = s.getColumn();
+	//Values of result matrix
+	std::vector<std::string> values(row * column);
+	//Assigning result matricies number of rows and number of columns
+	//Calculating result matrix values
+	for (int i = 0; i < row; ++i) {
+		for (int j = 0; j < column; ++j) {
+			//Temporary value. If there was error due socket calculation
+			//return error
+			value tmp = MatrixSocketMultiply(f, s, i, j);
+			if (tmp.state == 4) return tmp;
+			values[i * column + j] = tmp.eq;
+		}
+	}
+	//Generate result matrix
+	res.matrix = Matrix(values, row, column, token);
+	res.state = 1;
 	return res;
 }
 

@@ -6,6 +6,7 @@
 #define MATRIXCALC_H
 
 #include "Matrix.h"
+#include <stack>
 
 class MatrixCalc {
 	/*Variable structure. It has either matrix
@@ -75,6 +76,17 @@ class MatrixCalc {
 	value Inv(const Matrix &src);
 	//Expose function and replace token
 	std::string funcExpose(const Func &src, const std::string &forReplace);
+	//Execute function block, no matter it's for matricies, regular expression
+	//or it's some user defined
+	value funcExprExec(const std::string &oper, std::stack<value> &nums);
+	//Execute some base operands between two values
+	value Execute(const std::string &oper, const value &first, const value &second);
+	//Matricies summing and subtraction
+	value MatriciesSumSub(const std::string &oper, const value &first, const value &second);
+	//Matrix elements multiply results for socket
+	value MatrixSocketMultiply(const Matrix &f, const Matrix &s, int row, int column);
+	//Matricies multiplication
+	value MatrixMulti(const Matrix &f, const Matrix &s);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
