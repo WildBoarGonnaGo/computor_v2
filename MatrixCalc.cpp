@@ -963,11 +963,61 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		//In case of power raising return error
 		else if (oper == "^") {
 			error = "error: '/': " + first.matrix.getMatrix() + ": "
-			+ second.matrix.getMatrix() + ": matricies power raise is not permitted";
+				+ second.matrix.getMatrix() + ": matricies power raise is not permitted";
 			res.state = 4;
 		}
 	}
-	//
+	//In case of first variable is matrix and second is regular expression
+	else if (first.state == 1 && second.state == 2) {
+		//In case of multiplication
+		if (oper == "*") res = MatrixNumMulti(first, second);
+		//In case of summation return error
+		else if (oper == "+") {
+			error = "error: '+': " + first.eq + ": "
+				+ second.matrix.getMatrix() + ": summation of regular expression and matrix is not permitted";
+			res.state = 4;
+		}
+		//In case of subtraction return error
+		else if (oper == "-") {
+			error = "error: '-': " + first.eq + ": "
+				+ second.matrix.getMatrix() + ": subtraction of regular expression and matrix is not permitted";
+			res.state = 4;
+		}
+		//In case of power raise return error
+		else if (oper == "^") {
+			error = "error: '^': " + first.eq + ": "
+				+ second.matrix.getMatrix() + ": regular expression raising to a matrix is not permitted";
+			res.state = 4;
+		}
+		//In case of division return error
+		else if (oper == "/") {
+			error = "error: '/': " + first.eq + ": "
+				+ second.matrix.getMatrix() + ": division of regular expression and matrix is not permitted";
+			res.state = 4;
+		}
+	}
+	//In case of first variable is matrix and second is a regular expression
+	else if (first.state == 2 && first.state == 1) {
+		//In case of multiplication
+		if (oper == "*") res = MatrixNumMulti(second, first);
+		//In case of summation return error
+		else if (oper == "+") {
+			error = "error: '+': " + first.matrix.getMatrix() + ": "
+				+ second.eq + ": summation of matrix and regular expression is not permitted";
+			res.state = 4;
+		}
+		//In case of subtraction return error
+		else if (oper == "-") {
+			error = "error: '-': " + first.matrix.getMatrix() + ": "
+				+ second.eq + ": subtraction of matrix and regular expression is not permitted";
+			res.state = 4;
+		}
+		//In case of division
+		else if (oper == "/") {
+
+		}
+	}
+	return res;
 }
 //Matricies summing and subtract
 MatrixCalc::value MatrixCalc::MatriciesSumSub(const std::string &oper,
@@ -1070,6 +1120,47 @@ MatrixCalc::value MatrixCalc::MatrixMulti(const Matrix &f, const Matrix &s) {
 	//Generate result matrix
 	res.matrix = Matrix(values, row, column, token);
 	res.state = 1;
+	return res;
+}
+
+//Number and Matrix multiplication
+MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
+	//Result value
+	value res;
+	//Expression calculator
+	RevPolNotation pol(funcs);
+	pol.setToken(token);
+	//Lambda function. in case of error, return it
+	auto ErrorCheck = [](const std::string &errMsg, std::string &error) {
+		//Result value
+		value res;
+
+		if (!errMsg.empty()) {
+			error = errMsg; res.state = 4; return res;
+		}
+		res.state = 1;
+		return res;
+	};
+
+	//Let's calculate factor. In case of error, return it
+	pol.setInfixExpr(std::string(res.eq));
+	if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
+	//Calculate factor
+	std::string factor = pol.CalcIt();
+	if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
+	//Result values vector
+	std::vector<std::string> values;
+	//Multiply every element of second matrix and factor
+	for (int i = 0; i < s.matrix.getMatrix().size(); ++i) {
+		//Multiplication calculator. If error occured, return it
+		pol.setInfixExpr("(" + factor + ") * (" + res.matrix.getValues()[i] + ")");
+		if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
+		values[i] = pol.CalcIt();
+		if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
+	}
+	//Generate result matrix and return it
+	res.state = 1;
+	res.matrix = Matrix(values, s.matrix.getRow(), s.matrix.getColumn());
 	return res;
 }
 

@@ -87,6 +87,8 @@ class MatrixCalc {
 	value MatrixSocketMultiply(const Matrix &f, const Matrix &s, int row, int column);
 	//Matricies multiplication
 	value MatrixMulti(const Matrix &f, const Matrix &s);
+	//Number and Matrix multiplication
+	value MatrixNumMulti(const value &f, const value &s);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
