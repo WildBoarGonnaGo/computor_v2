@@ -87,8 +87,10 @@ class MatrixCalc {
 	value MatrixSocketMultiply(const Matrix &f, const Matrix &s, int row, int column);
 	//Matricies multiplication
 	value MatrixMulti(const Matrix &f, const Matrix &s);
-	//Number and Matrix multiplication
+	//Number and Matrix multiplication. 'f' is a regular expression, 's' is a matrix
 	value MatrixNumMulti(const value &f, const value &s);
+	//Matrix power raising. 'f' is a matrix, 's' should be integer number
+	value MatrixPowerRaise(const value &f, const value &s);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
@@ -103,6 +105,8 @@ public:
 	const std::string &getError() const;
 	//Get final value
 	const value getFinValue() const;
+	//Get result of calculations as a string
+	const std::string getCalcResult() const;
 };
 
 

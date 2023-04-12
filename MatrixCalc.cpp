@@ -349,8 +349,6 @@ MatrixCalc::MatrixCalc(std::map<std::string, Func> &funcsSrc,
 std::string MatrixCalc::CalcIt() {
 	//Stack of values
 	std::stack<value> nums;
-	//Result string
-	std::string res;
 	//String parser
 	std::string parser;
 	//reset calcError for recalculcations;
@@ -449,33 +447,53 @@ std::string MatrixCalc::CalcIt() {
 					calcResult.clear(); finCalc.state = 4; return "";
 				}
 				value tmp = nums.top(); nums.pop();
+				//Set new value with '-1' multiplier
+				value multip; multip.eq = "-1"; multip.state = 2;
 				//Push a new value into top of the stack
-				nums.push(RemoveTrailZeros(Execute("-", "0", tmp)));
+				tmp = Execute("*", multip, tmp);
+				nums.push(tmp);
 				//Onto next cycle iteration
-				parser.clear();
-				while (std::isspace(postfixExpr[i + 1])) ++i;
 				continue ;
 			}
 
 			//Declare first and second operand for some operation
-			std::string first, second;
+			value first, second;
 			//Get values for these operands in reverse order
-			if (!nums.empty()) { second = nums.top(); nums.pop(); }
-			else second = "";
+			//Check whether stack is empty.  If it's return error
+			//else pop it
+			if (nums.empty()) {
+				error = "error: '" + it->eq + "': operands stack is empty";
+				calcResult.clear(); finCalc.state = 4; return "";
+			}
+			second = nums.top(); nums.pop();
 
-			if (!nums.empty()) { first = nums.top(); nums.pop(); }
-			else first = "";
+			//Check whether stack is empty.  If it's return error
+			//else pop it
+			if (nums.empty()) {
+				error = "error: '" + it->eq + "': operands stack is empty";
+				calcResult.clear(); finCalc.state = 4; return "";
+			}
+			first = nums.top(); nums.pop();
+			//Calculate result value
+			value tmp = Execute(it->eq, first, second);
+			//If there was error due calculation, return error
+			if (tmp.state == 4) { calcResult.clear(); finCalc.state = 4; return ""; }
 			//Get operation result and push it into stack
-			nums.push(RemoveTrailZeros(Execute(parser, first, second)));
-			if (calcError) return nums.top();
-			parser.clear();
+			nums.push(tmp);
+			//if (calcError) return nums.top();
+			//parser.clear();
 		}
 		//Passings whitespaces
 		//while (std::isspace(postfixExpr[i + 1])) ++i;
 	}
-	res = nums.top();
+	//Generate result value
+	finCalc = nums.top();
+	//If result is a regular expression
+	if (finCalc.state == 2) calcResult = finCalc.eq;
+	//If result is a matrix
+	if (finCalc.state == 1) calcResult = finCalc.matrix.toString();
 	nums.pop();
-	return res;
+	return calcResult;
 }
 
 MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &var) {
@@ -493,7 +511,7 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 
 	//if (var.state == 2) hasAlpha = std::find_if(var.eq.begin(), var.eq.end(), ifAlpha) != var.eq.end();
 	//If we got token
-	if (var.state == 3) {
+	/*if (var.state == 3) {
 		//Search in matrix function set
 		if (matrixSearch != baseFuncsMatrix.end() || (search != funcs.end() && search->second.tokenIsMatrix == 1)) {
 			//If there is such matrix function, check if token is matrix
@@ -519,7 +537,7 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			res.state = 3;
 			res.matrix.setToken(var.eq);
 		}
-	}
+	}*/
 	//In case of basic matrix function
 	if (matrixSearch != baseFuncsMatrix.end()) {
 		//Check is variable a matrix, if it's not return error
@@ -970,6 +988,31 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 	//In case of first variable is matrix and second is regular expression
 	else if (first.state == 1 && second.state == 2) {
 		//In case of multiplication
+		if (oper == "*") res = MatrixNumMulti(second, first);
+		//In case of summation return error
+		else if (oper == "+") {
+			error = "error: '+': " + first.matrix.getMatrix() + ": "
+				+ first.eq + ": summation of matrix and regular expression is not permitted";
+			res.state = 4;
+		}
+		//In case of subtraction return error
+		else if (oper == "-") {
+			error = "error: '-': " + first.matrix.getMatrix() + ": "
+				+ second.eq + ": subtraction of matrix and regular expression is not permitted";
+			res.state = 4;
+		}
+		//In case of division
+		else if (oper == "/") {
+			//Temporary value for further calculations
+			value tmp; tmp.eq = "1 / (" + second.eq + ")";
+			res = MatrixNumMulti(tmp, first);
+		}
+		//In case of power raising
+		else if (oper == "^") res = MatrixPowerRaise(first, second);
+	}
+	//In case of first variable is a regular expression and second is a matrix
+	else if (first.state == 2 && second.state == 1) {
+		//In case of multiplication
 		if (oper == "*") res = MatrixNumMulti(first, second);
 		//In case of summation return error
 		else if (oper == "+") {
@@ -983,42 +1026,32 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 				+ second.matrix.getMatrix() + ": subtraction of regular expression and matrix is not permitted";
 			res.state = 4;
 		}
-		//In case of power raise return error
-		else if (oper == "^") {
-			error = "error: '^': " + first.eq + ": "
-				+ second.matrix.getMatrix() + ": regular expression raising to a matrix is not permitted";
-			res.state = 4;
-		}
 		//In case of division return error
 		else if (oper == "/") {
 			error = "error: '/': " + first.eq + ": "
 				+ second.matrix.getMatrix() + ": division of regular expression and matrix is not permitted";
 			res.state = 4;
 		}
+		//In case of power raise return error
+		else if (oper == "^") {
+			error = "error: '^': " + first.eq + ": "
+				+ second.matrix.getMatrix() + ": regular expression raising to a matrix is not permitted";
+			res.state = 4;
+		}
 	}
-	//In case of first variable is matrix and second is a regular expression
-	else if (first.state == 2 && first.state == 1) {
-		//In case of multiplication
-		if (oper == "*") res = MatrixNumMulti(second, first);
-		//In case of summation return error
-		else if (oper == "+") {
-			error = "error: '+': " + first.matrix.getMatrix() + ": "
-				+ second.eq + ": summation of matrix and regular expression is not permitted";
-			res.state = 4;
-		}
-		//In case of subtraction return error
-		else if (oper == "-") {
-			error = "error: '-': " + first.matrix.getMatrix() + ": "
-				+ second.eq + ": subtraction of matrix and regular expression is not permitted";
-			res.state = 4;
-		}
-		//In case of division
-		else if (oper == "/") {
-
-		}
+	//In case of both values are regular expressions
+	if (first.state == 2 && second.state == 2) {
+		//Expression calculator, in case of error return it
+		RevPolNotation pol(funcs);
+		pol.setInfixExpr("(" + first.eq + ") " + oper + " (" + second.eq + ")");
+		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); res.state = 4; }
+		res.eq = pol.CalcIt();
+		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); res.state = 4; }
+		res.state = 2;
 	}
 	return res;
 }
+
 //Matricies summing and subtract
 MatrixCalc::value MatrixCalc::MatriciesSumSub(const std::string &oper,
 											  const value &first, const value &second) {
@@ -1069,8 +1102,8 @@ MatrixCalc::value MatrixCalc::MatrixSocketMultiply(const Matrix &f, const Matrix
 
 	//Computing result
 	for (int i = 0; i < f.getColumn(); ++i)
-		res.eq += (res.eq.empty() ? "(" : " + (") + f.getValues()[row * f.getColumn() + i]
-				+ " * " + s.getValues()[i * s.getColumn() + column] + ")";
+		res.eq += (res.eq.empty() ? "((" : " + ((") + f.getValues()[row * f.getColumn() + i]
+				+ ") * (" + s.getValues()[i * s.getColumn() + column] + "))";
 	//Expression calculator. If there will be some due calculation
 	//error return it
 	RevPolNotation pol(funcs);
@@ -1123,7 +1156,7 @@ MatrixCalc::value MatrixCalc::MatrixMulti(const Matrix &f, const Matrix &s) {
 	return res;
 }
 
-//Number and Matrix multiplication
+//Number and Matrix multiplication 'f' is a regular expression, 's' is a matrix
 MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
 	//Result value
 	value res;
@@ -1143,7 +1176,7 @@ MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
 	};
 
 	//Let's calculate factor. In case of error, return it
-	pol.setInfixExpr(std::string(res.eq));
+	pol.setInfixExpr(std::string(f.eq));
 	if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
 	//Calculate factor
 	std::string factor = pol.CalcIt();
@@ -1153,7 +1186,7 @@ MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
 	//Multiply every element of second matrix and factor
 	for (int i = 0; i < s.matrix.getMatrix().size(); ++i) {
 		//Multiplication calculator. If error occured, return it
-		pol.setInfixExpr("(" + factor + ") * (" + res.matrix.getValues()[i] + ")");
+		pol.setInfixExpr("(" + factor + ") * (" + s.matrix.getValues()[i] + ")");
 		if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
 		values[i] = pol.CalcIt();
 		if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
@@ -1164,8 +1197,54 @@ MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
 	return res;
 }
 
+//Matrix power raising. 'f' is a matrix, 's' should be integer number
+MatrixCalc::value MatrixCalc::MatrixPowerRaise(const value &f, const value &s) {
+	//Result value
+	value res;
+
+	//If matrix is not square return error
+	if (f.matrix.getColumn() != s.matrix.getRow()) {
+		error = "error: '^': " + f.matrix.getMatrix()
+				+ ": for proper power raising matrix should be squared.";
+		res.state = 4; return res;
+	}
+	//Expression calculator. In case of calculation error return it
+	RevPolNotation pol(funcs);
+	pol.setToken(token);
+	pol.setInfixExpr("(" + std::string(s.eq) + ")");
+	if (!pol.getErrMsg().empty()) {
+		error = pol.getErrMsg();
+		res.state = 4; return res;
+	}
+	//Power value
+	std::string power = pol.CalcIt();
+	if (!pol.getErrMsg().empty()) {
+		error = pol.getErrMsg();
+		res.state = 4; return res;
+	}
+	//Check is power a interger value, and if it's
+	//not return error
+	if (power.find('.') != std::string::npos) {
+		error = "error: '^': " + f.matrix.getMatrix()
+				+ ": " + power + ": power value is not an integer value";
+		res.state = 4; return res;
+	}
+	//Iterator bound
+	int bound = std::stoi(power);
+	res = f;
+	//Matrix raising. In case of error, return it
+	for (int i = 1; i < bound; ++i) {
+		res = MatrixMulti(res.matrix, res.matrix);
+		if (res.state == 4) return res;
+	}
+	return res;
+}
+
 //Get error string
 const std::string &MatrixCalc::getError() const { return error; }
 
 //Get final value
 const MatrixCalc::value MatrixCalc::getFinValue() const { return finCalc; }
+
+//Get result of calculations as a string
+const std::string MatrixCalc::getCalcResult() const { return calcResult; }

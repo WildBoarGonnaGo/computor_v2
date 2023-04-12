@@ -1,5 +1,6 @@
 #include "EquationProc.h"
 #include "computor.h"
+#include "MatrixCalc.h"
 #include <iostream>
 
 EquationProc::EquationProc() { }
@@ -44,12 +45,27 @@ void EquationProc::AddEquation(std::string &&equation) {
 		equalSignPos = sample.find('=') - 1;
 		while (std::isspace(sample[equalSignPos])) --equalSignPos;
 		sample = sample.substr(0, equalSignPos + 1);
+		//If we deal with matricies calculate is as matrix
+		if (isMatrix) {
+			MatrixCalc calc(funcs, matricies, sample);
+			//If there is some error, return it
+			if (!calc.getError().empty()) history.push_back(calc.getError());
+			else history.push_back(calc.getCalcResult());
+			return ;
+		}
 		parser.setInfixExpr(std::move(sample));
 		history.push_back(parser.CalcIt());
 		return ;
 	}
 	//If we deal with complex computational part
 	if (questMark == 2) {
+		//If there is some matrix in comptutational part
+		//return error
+		if (isMatrix) {
+			history.push_back(std::string("error: binary function calculation: there is a matrix function\n")
+			 + "or matrix variable, which is not permitted in this case");
+			return ;
+		}
 		//Result parsed equation
 		//std::string res, aux;
 		int delim = sample.find('=');
@@ -95,12 +111,21 @@ void EquationProc::AddEquation(std::string &&equation) {
 			history.push_back(errMsg);
 			return ;
 		}
+		//Calculate expression, in case of error return it
 		parser.setInfixExpr(std::move(sample));
+		if (!parser.getErrMsg().empty()) {
+			history.push_back(parser.getErrMsg());
+			return ;
+		}
 		vars[entityName] = parser.CalcIt();
+		if (!parser.getErrMsg().empty()) {
+			history.push_back(parser.getErrMsg());
+			return ;
+		}
 		history.push_back(vars[entityName]);
 	}
 	//Function case calculation
-	else {
+	else if (state == 2) {
 		parser.setToken(funcs[entityName].token);
 		sample = funcs[entityName].equation;
 		if (!InitEquationParse(sample, errMsg, 1, entityName, oldValue)) {
@@ -115,17 +140,23 @@ void EquationProc::AddEquation(std::string &&equation) {
 		}
 		else history.push_back(funcs[entityName].equation);
 	}
+	//Matrix case calculation
+	else {
+
+	}
 }
 
 //Method to define string represents a variable or a function
 //it returns integer value represents next states: 1 - we're dealing with variable
-//2 - we're dealing with function; 0 - error
+//2 - we're dealing with function; 3 - if we deal with matrix; 0 - error
 int EquationProc::EntityDefine(std::string &error, const std::string &src,
 							   std::string &res, std::string &oldValue) {
 	int i = 0, isfunc = 0;
 	Func func;
 	//Equation string
 	std::string eq;
+	//Set of base matrix functions
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "l1norm", "l2norm", "det", "adj" };
 	//Seeking name of variables (function) and name of token
 	//passing whitespaces
 	auto indx = [](const std::string &src, std::string &dst, int i) {
@@ -137,16 +168,6 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 		while (std::isspace(src[i])) ++i;
 		return i;
 	};
-	/*auto RetError = [](std::string &error, const std::string &errMsg,
-			const int &i, const std::string &src) {
-		error = src;
-		error.push_back('\n');
-		error.insert(error.size(), i - 1, ' ');
-		error.push_back('^');
-		error += errMsg;
-		return 0;
-	};*/
-
 
 	i = indx(src, res, i);
 	if (src[i] == '(') {
@@ -171,32 +192,60 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 	}
 	//Assigning equation string
 	eq = src.substr(src.find_first_not_of(" =", i));
-	//Search matrix, or squarebraces in  in function or variable
+	isMatrix = false;
+	//Search squarebraces in function or variable
+	//If there is, we deal with matrix, so set isMatrix variable as true
+	if (eq.find('[') != std::string::npos || eq.find(']') != std::string::npos)
+		isMatrix = true;
+	//Search matrix, in function or variable
 	//If there is, set isMatrix variable as true
-	isMatrix = true;
+	//If isMatrix is already true, break the loop
 	for (std::map<std::string, Matrix>::iterator it = matricies.begin(); it != matricies.end(); ++it) {
+		if (isMatrix) break ;
 		if (auto search = eq.find(it->first); search != std::string::npos) {
 			isMatrix = true; break;
 		}
 	}
-	if (eq.find('[') != std::string::npos || eq.find(']') != std::string::npos)
-		isMatrix = true;
+	//Search matrix function in function or variable
+	//If there is, set isMatrix variable as true
+	//If isMatrix is already true, break the loop
+	for (std::set<std::string>::iterator it = baseMatrixFuncs.begin(); it != baseMatrixFuncs.end(); ++it) {
+		if (isMatrix) break;
+		if (auto search = eq.find(*it); search != std::string::npos) {
+			isMatrix = true; break ;
+		}
+	}
 	//If we deal with function
 	if (isfunc) {
+		//If there is matrix in function, return error
+		if (isMatrix) {
+			funcs.erase(res);
+			return RetError(error,
+							"\nerror: " + res + ": matricies function and variable in function is not supported",
+							i, src);
+		}
 		funcs[res].equation = src.substr(src.find_first_not_of(" =", i));
 		funcs[res].isMatrix = isMatrix;
 		return 2;
 	}
+	//If there is some old matrix value, assign current matrix value to old value
+	//and if equation has old value, we deal with matricies
+	if (auto search = matricies.find(res); search != matricies.end()) {
+		oldValue = matricies[res].getMatrix();
+		if (eq.find(oldValue) != std::string::npos || eq.find(res) != std::string::npos)
+			isMatrix = true;
+	}
+	//If there is some old regular value value, assign current variable to old value
+	else if (auto search = vars.find(res); search != vars.end())
+		oldValue = vars[res];
 	//If we deal with matricies
 	if (isMatrix && !isfunc) {
-		//If there is some old matrix value, fix it
-		if (auto search = matricies.find(res); search != matricies.end())
-			oldValue = matricies[res].getMatrix();
-
+		//If there is regular value with 'res' name, delete it
+		if (auto search = vars.find(res); search != vars.end()) vars.erase(res);
+		matrixEq = src.substr(src.find_first_not_of(" =", i));
+		return 3;
 	}
 	//If we deal with variables
-	if (auto search = vars.find(res); search != vars.end())
-		oldValue = vars[res];
 	vars[res] = src.substr(src.find_first_not_of(" =", i));
 	return 1;
 }
@@ -270,7 +319,10 @@ some error we return 0, if question mark is right after
 the equal sign we return 1, if question is after equal sign
 and some piece of equation - return 2*/
 int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std::string &token) {
+	//Base functions for regular expressions
 	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
+	//Base functions for matricies
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "l1norm", "l2norm", "det", "adj" };
 	int count = 0, order = 0;
 	std::string parse;
 
@@ -299,15 +351,21 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 					return RetError(error, "\nerror: this is a matrix, not a function", i, src);
 				if (auto search = funcs.find(parse); search == funcs.end())
 					return RetError(error, "\nerror: there is no such function", i, src);
+				//If some matrix function is found, we deal with matricies
+				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end())
+					isMatrix = true;
 			} else {
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
 					return RetError(error, "\nerror: this is function, not a variable", i, src);
+				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end())
+					{ return RetError(error, "\nerror: this is function, not a variable", i, src); }
 				if (auto search = funcs.find(parse); search != funcs.end())
 					return RetError(error, "\nerror: this is function, not a variable", i, src);
 				if (auto search = vars.find(parse); search == vars.end() && !token.empty())
 					return RetError(error, "\nerror: there is no such variable", i, src);
 				else if (auto search = vars.find(parse); search == vars.end() && token.empty())
 					token = parse;
+				//If some matrix is found, we deal with matricies
 				else if (auto search = matricies.find(parse); search != matricies.end())
 					isMatrix = true;
 				else
@@ -402,9 +460,17 @@ void EquationProc::HistoryOutput() {
 }
 //Output list of all available variables
 void EquationProc::VariablesOutput() {
+	//Variables iterator
 	std::map<std::string, std::string>::iterator it = vars.begin();
+	//Matricies iterator
+	std::map<std::string, Matrix>::iterator itMap = matricies.begin();
 
-	for ( ; it != vars.end(); ++it) {
+	//Regular variables output
+	std::cout << "Variables:" << std::endl;
+	for ( ; it != vars.end(); ++it)
 		std::cout << it->first << " = " << it->second << std::endl;
-	}
+	//Matricies output
+	std::cout << "Matricies:" << std::endl;
+	for ( ; itMap != matricies.end(); ++itMap)
+		std::cout << itMap->first << ':' << std::endl << itMap->second.toString();
 }

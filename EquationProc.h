@@ -15,8 +15,13 @@ class EquationProc {
 	std::map<std::string, Matrix> matricies;
 	//Is computational part of equation matrix
 	bool isMatrix;
+	//Matrix equation for further computations
+	std::string matrixEq;
+
 
 	//Method to define string represents a variable or a function
+	//it returns integer value represents next states: 1 - we're dealing with variable
+	//2 - we're dealing with function; 3 - if we deal with matrix; 0 - error
 	int EntityDefine(std::string &error, const std::string &src,
 					 std::string &res, std::string &oldValue);
 	//Private submethod. Calculate number of equal signs in string
