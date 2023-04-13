@@ -98,6 +98,21 @@ int main(void) {
 	proc.AddEquation("> y = 0");
 	proc.AddEquation("> funA(z) = y ?");
 
+	//Testing matrix equations
+	proc.AddEquation("> varA = [[2,3];[4,3]]");
+	proc.AddEquation("> varE = [ [ 3 , 4 ] ]");
+	proc.AddEquation("> varF = []");
+	proc.AddEquation("> varF = [[[[[");
+	proc.AddEquation("> varF = ]]]]]");
+	proc.AddEquation("> varF = [ [ 3 , 4 ] [ 5 ]]");
+	proc.AddEquation("> varF = [ [ 3 , 4 ]    ; [ 5 ]]");
+	proc.AddEquation("> varF = [ [ -1, -2, 1 ] ; [ 5, 9, -8 ]] + [[10,-25,98];[3,0,-14]]");
+	proc.AddEquation("> varG = [ [ -1, -2, 1 ] ; [ 5, 9, -8 ]]");
+	proc.AddEquation("> varH = [[10,-25,98];[3,0,-14]]");
+	proc.AddEquation("> varI = varG - varH");
+	proc.AddEquation("> varJ = [[-1, -2, 7] ; [4, 9, 0]]");
+	proc.AddEquation("> 3 * varJ = ?");
+
 	//History of operations output
 	std::cout << "History of operations:" << std::endl;
 	proc.HistoryOutput();

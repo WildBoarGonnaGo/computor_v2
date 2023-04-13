@@ -17,7 +17,12 @@ class EquationProc {
 	bool isMatrix;
 	//Matrix equation for further computations
 	std::string matrixEq;
-
+	//Is calculating equation a function
+	bool isFunc;
+	//Is oldValue a matrix
+	bool oldValueIsMatrix;
+	//Equation string in case of function or regular variable
+	std::string regEqStr;
 
 	//Method to define string represents a variable or a function
 	//it returns integer value represents next states: 1 - we're dealing with variable
@@ -36,7 +41,7 @@ class EquationProc {
 	int QuestionMarkPreview(std::string &src, std::string &error, std::string &token);
 	//Private method. It parse string in terms of variable and function existence
 	int InitEquationParse(std::string &src, std::string &error,
-						  int isfunc, std::string &name, const std::string &oldValue);
+						  std::string &name, const std::string &oldValue);
 	//Private method. It parse computational string
 	int ParseComputeStr(std::string &src, std::string &error);
 	//Private method. It generates error string and mark error

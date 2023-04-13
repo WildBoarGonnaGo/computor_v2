@@ -582,10 +582,10 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 		if (!sNum) return divError(calcError, errmsg);
 		res = fNum / sNum;
 	}
-	else if (!oper.compare("^")) res = std::powl(fNum, sNum);
+	else if (!oper.compare("^")) res = std::pow(fNum, sNum);
 	else if (!oper.compare("%")) {
 		if (!sNum) return divError(calcError, errmsg);
-		res = std::fmodl(fNum, sNum);
+		res = std::fmod(fNum, sNum);
 	}
 	return std::to_string(res);
 }
@@ -619,8 +619,8 @@ std::string RevPolNotation::funcExecute(const std::string &oper, const std::stri
 		std::string calc = UDfuncExpose(search->second, var);
 		return RevPolNotation(std::move(calc), userDefFuncs).CalcIt();
 	}
-	if (!oper.compare("sin")) res = std::sinl(std::stold(var));
-	else if (!oper.compare("cos")) res = std::cosl(std::stold(var));
+	if (!oper.compare("sin")) res = std::sin(std::stold(var));
+	else if (!oper.compare("cos")) res = std::cos(std::stold(var));
 	else if (!oper.compare("tan")) {
 		if (!var.compare("1.570796")) {
 			calcError = true;
@@ -632,8 +632,8 @@ std::string RevPolNotation::funcExecute(const std::string &oper, const std::stri
 		}
 		res = std::tan(std::stod(var));
 	}
-	else if (!oper.compare("exp")) res = std::expl(std::stold(var));
-	else if (!oper.compare("sqrt")) res = std::sqrtl(std::stold(var));
+	else if (!oper.compare("exp")) res = std::exp(std::stold(var));
+	else if (!oper.compare("sqrt")) res = std::sqrt(std::stold(var));
 	else if (!oper.compare("abs")) res = std::abs(std::stold(var));
 
 	return std::to_string(res);
@@ -660,6 +660,8 @@ std::string		RevPolNotation::ProcessPostfix() {
 	};
 	//Parsing string
 	for (int i = 0; i < inifixExpr.size(); ++i) {
+		//Passing whitespaces
+		while (std::isspace(inifixExpr[i])) ++i;
 		//If character is digit
 		if (std::isdigit(inifixExpr[i]) || inifixExpr[i] == '.') {
 			if (!number) number = true;
@@ -823,7 +825,9 @@ std::string		RevPolNotation::ProcessPostfix() {
 		}
 		//And finaly return error if we deal with some obscure character
 		else {
-
+			errmsg = markPlace(inifixExpr, i) +
+					"\nerror: obscure character";
+			res.clear(); return res;
 		}
 		//Passing whitespaces
 		while (std::isspace(inifixExpr[i + 1])) ++i;

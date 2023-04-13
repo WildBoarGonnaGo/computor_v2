@@ -34,10 +34,10 @@ int MatrixCalc::ParseMatrix(int &i) {
 	prev = i;
 	//Generating matrix string
 	for ( ; i < infixEq.size(); ++i) {
-		if (infixEq[i] == '[') ++brace;
-		else if (infixEq[i] == ']') --brace;
+		if (infixEq[i] == '[') { prev = i; ++brace; }
+		else if (infixEq[i] == ']') { prev = i; --brace; }
 		res.push_back(infixEq[i]);
-		if (!brace) break;
+		if (!brace || brace > 2 || brace < 0) break;
 	}
 	//If wrong number of braces, return error
 	if (brace) {
@@ -90,6 +90,7 @@ void MatrixCalc::ProcessPostfix() {
 		if (std::isdigit(infixEq[i]) || infixEq[i] == '.') {
 			//Initiate new number value
 			value numberUnit;
+			//Check order of operands and operators, in case of error return it
 			if (!number) number = true;
 			else {
 				error = MarkError(infixEq, i) + "\nerror: wrong order: there should be a number";
@@ -105,9 +106,16 @@ void MatrixCalc::ProcessPostfix() {
 			}
 			postfixQueue.push_back(numberUnit);
 		}
-		//if character is a left squarebrace
-		else if (infixEq[i] == '[')
+		//if character is a left squarebrace or right squarebrace
+		else if (infixEq[i] == '[' || infixEq[i] == ']') {
+			//Check order of operands and operators, in case of error return it
+			if (!number) number = true;
+			else {
+				error = MarkError(infixEq, i) + "\nerror: wrong order: there should be a matrix";
+				postfixQueue.clear(); return ;
+			}
 			if (!ParseMatrix(i)) { postfixQueue.clear(); return ; }
+		}
 		//if character is a left braced
 		else if (infixEq[i] == '(') {
 			//Push it into stack and announcing about a left brace
@@ -121,7 +129,7 @@ void MatrixCalc::ProcessPostfix() {
 			brace_str.push_back(infixEq[i]);
 			oper.push(brace_str); ++brace;
 		}
-			//Check a wrong right brace case
+		//Check a wrong right brace case
 		else if (infixEq[i] == ')' && !brace) {
 			//std::cerr << "extra braces found" << std::endl;
 			error = MarkError(infixEq, i) + "\nerror: extra brace found";
@@ -344,6 +352,7 @@ MatrixCalc::MatrixCalc(std::map<std::string, Func> &funcsSrc,
 		StrMultiplySearch(infixEq, token);
 	StrMultiplySearch(infixEq, "pi");
 	StrMultiplySearch(infixEq, "i");
+	ProcessPostfix();
 }
 
 std::string MatrixCalc::CalcIt() {

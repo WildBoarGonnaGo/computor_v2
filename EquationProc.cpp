@@ -10,9 +10,12 @@ void EquationProc::AddEquation(std::string &&equation) {
 	int				equalSignPos, state, questMark;
 	std::string		sample, errMsg, curToken, entityName, oldValue;
 	RevPolNotation	parser(funcs);
-	//We don't know, if we deal with matrix or not, thus set signal
-	//as false
+	//We don't know, if we deal with matrix or not,
+	//so set signal as false
 	isMatrix = false;
+	isFunc = false;
+	//Clear expression strings for further calculations
+	regEqStr.clear(); matrixEq.clear();
 	//Lambda function. it returns position if there is some base function
 	//else it returns -1
 	auto ifBaseFuncIn = [](const std::string &src, std::string &error) {
@@ -99,18 +102,28 @@ void EquationProc::AddEquation(std::string &&equation) {
 	}
 	//Parsing variable or function
 	state = EntityDefine(errMsg, sample, entityName, oldValue);
+	//If we deal with matricies, set sample as a matrix equation (matrixEq)
+	//else set sample as a regular equation (regEqStr)
+	if (!matrixEq.empty()) sample = matrixEq;
+	else sample = regEqStr;
 	//if error occured
 	if (!state) {
 		history.push_back(errMsg);
 		return ;
 	}
+	isFunc = (state == 2) ? true : false;
+	//Check error in equations, and if there are, return it
+	if (!InitEquationParse(sample, errMsg, entityName, oldValue)) {
+		history.push_back(errMsg);
+		return ;
+	}
 	//Variable case calculation
 	else if (state == 1) {
-		sample = vars[entityName];
-		if (!InitEquationParse(sample, errMsg, 0, entityName, oldValue)) {
+		//sample = vars[entityName];
+		/*if (!InitEquationParse(sample, errMsg, 0, entityName, oldValue)) {
 			history.push_back(errMsg);
 			return ;
-		}
+		}*/
 		//Calculate expression, in case of error return it
 		parser.setInfixExpr(std::move(sample));
 		if (!parser.getErrMsg().empty()) {
@@ -127,11 +140,11 @@ void EquationProc::AddEquation(std::string &&equation) {
 	//Function case calculation
 	else if (state == 2) {
 		parser.setToken(funcs[entityName].token);
-		sample = funcs[entityName].equation;
-		if (!InitEquationParse(sample, errMsg, 1, entityName, oldValue)) {
+		//sample = funcs[entityName].equation;
+		/*if (!InitEquationParse(sample, errMsg, 1, entityName, oldValue)) {
 			history.push_back(errMsg);
 			return ;
-		}
+		}*/
 		parser.setInfixExpr(std::move(sample));
 		funcs[entityName].equation = parser.CalcIt();
 		if (funcs[entityName].equation.empty() && !parser.getErrMsg().empty()) {
@@ -142,7 +155,37 @@ void EquationProc::AddEquation(std::string &&equation) {
 	}
 	//Matrix case calculation
 	else {
-
+		matrixEq.clear();
+		//Matrix expression calculator
+		MatrixCalc calc(funcs, matricies, sample);
+		//In case of error, result old value if
+		if (!calc.getError().empty()) {
+			history.push_back(calc.getError());
+			if (!oldValue.empty()) {
+				if (!oldValueIsMatrix) vars[entityName] = oldValue;
+			}
+			return ;
+		}
+		//Calculate result, in case of calculation error, return it
+		std::string resTmp = calc.CalcIt();
+		if (!calc.getError().empty()) {
+			history.push_back(calc.getError());
+			if (!oldValue.empty()) {
+				if (!oldValueIsMatrix) vars[entityName] = oldValue;
+			}
+			return ;
+		}
+		//If calculation was succesfull, check type of variable
+		//In case of regular value
+		if (calc.getFinValue().state == 2) {
+			vars[entityName] = resTmp;
+			history.push_back(vars[entityName]);
+		}
+		//In case of matrix
+		else {
+			matricies[entityName] = calc.getFinValue().matrix;
+			history.push_back(matricies[entityName].toString());
+		}
 	}
 }
 
@@ -225,7 +268,8 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 							i, src);
 		}
 		funcs[res].equation = src.substr(src.find_first_not_of(" =", i));
-		funcs[res].isMatrix = isMatrix;
+		//funcs[res].isMatrix = isMatrix;
+		regEqStr = funcs[res].equation;
 		return 2;
 	}
 	//If there is some old matrix value, assign current matrix value to old value
@@ -233,13 +277,13 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 	if (auto search = matricies.find(res); search != matricies.end()) {
 		oldValue = matricies[res].getMatrix();
 		if (eq.find(oldValue) != std::string::npos || eq.find(res) != std::string::npos)
-			isMatrix = true;
+			{ isMatrix = true; oldValueIsMatrix = true; }
 	}
 	//If there is some old regular value value, assign current variable to old value
 	else if (auto search = vars.find(res); search != vars.end())
-		oldValue = vars[res];
+		{ oldValue = vars[res]; oldValueIsMatrix = false; }
 	//If we deal with matricies
-	if (isMatrix && !isfunc) {
+	if (isMatrix) {
 		//If there is regular value with 'res' name, delete it
 		if (auto search = vars.find(res); search != vars.end()) vars.erase(res);
 		matrixEq = src.substr(src.find_first_not_of(" =", i));
@@ -247,6 +291,7 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 	}
 	//If we deal with variables
 	vars[res] = src.substr(src.find_first_not_of(" =", i));
+	regEqStr = vars[res];
 	return 1;
 }
 
@@ -395,9 +440,12 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 
 //Private method. It parse string in terms of variable and function existence
 int EquationProc::InitEquationParse(std::string &src, std::string &error,
-									int isfunc, std::string &name, const std::string &oldValue) {
+									std::string &name, const std::string &oldValue) {
 	std::string parse, errorPrefix;
+	//Set of base functions for regular values
 	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
+	//Set of base functions for matricies
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "l1norm", "l2norm", "det", "adj" };
 
 	for (int i = 0; i < src.size(); ++i) {
 		if (std::isalpha(src[i])) {
@@ -407,23 +455,27 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 				{ parse.clear(); continue ; }
 			if (src[i] == '(') {
 				errorPrefix =  name + "(" + funcs[name].token + ")" + " = ";
-				if (isfunc && parse.size() == name.size() &&!parse.compare(name))
+				if (isFunc && parse.size() == name.size() &&!parse.compare(name))
 					return RetError(error, "\nerror: recursive function call is unexceptable!",
 									i + errorPrefix.size(), errorPrefix + src);
 				if (auto search = vars.find(parse); search != vars.end())
 					return RetError(error, "\nerror: this is variable, not a function: " + parse,
 									i + errorPrefix.size(), errorPrefix + src);
 				if (auto search = matricies.find(parse); search != matricies.end())
-					return RetError(error, "\nerror: this is a matrix, not a function", i, src);
+					return RetError(error, "\nerror: this is a matrix, not a function: " + parse,
+									i + errorPrefix.size(), errorPrefix + src);
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
 					{ parse.clear(); continue ; }
 				if (auto search = funcs.find(parse); search == funcs.end())
 					return RetError(error, "\nerror: there is no such function: " + parse,
 									i + errorPrefix.size(), errorPrefix + src);
+				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end() && isFunc)
+					return RetError(error, "\nerror: " + parse + ": matrix function in function equation is not supported:",
+									i + errorPrefix.size(), errorPrefix + src);
 			}
 			else {
 				errorPrefix = name + " = ";
-				if (isfunc && funcs[name].token.size() == parse.size() && !funcs[name].token.compare(parse))
+				if (isFunc && funcs[name].token.size() == parse.size() && !funcs[name].token.compare(parse))
 					{ parse.clear(); continue; }
 				if (auto search = funcs.find(parse); search != funcs.end())
 					return RetError(error, "\nerror: this is a function, not a variable: " + parse,
@@ -431,10 +483,13 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
 					return RetError(error, "\nerror: this is a function, not a variable: " + parse,
 									i + errorPrefix.size(), errorPrefix + src);
-				if (!isfunc && parse.size() == name.size() && !parse.compare(name) && !oldValue.empty())
+				if (!isFunc && parse.size() == name.size() && !parse.compare(name) && !oldValue.empty())
 					src.replace(src.find(parse), parse.size(), oldValue);
-				else if (!isfunc && parse.size() == name.size() && !parse.compare(name) && oldValue.empty())
+				else if (!isFunc && parse.size() == name.size() && !parse.compare(name) && oldValue.empty())
 					return RetError(error, "\nerror: there is no previous declaration of '" + name + "' variable",
+									i + errorPrefix.size(), errorPrefix + src);
+				if (auto search = matricies.find(parse); search != matricies.end() && isFunc)
+					return RetError(error, "\nerror: " + parse + ": matrix variable in function equation is not supported:",
 									i + errorPrefix.size(), errorPrefix + src);
 				if (auto search = matricies.find(parse); search != matricies.end())
 					isMatrix = true;
@@ -448,6 +503,14 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 			//If character is left or right squarebrace, we deal with matrix
 			if (src[i] == ']' || src[i] == '[')
 				isMatrix = true;
+			//If we deal with matricies and functions in the same time
+			//return error
+			if (isFunc && (src[i] == '[' || src[i] == ']')) {
+				std::string braceToken; braceToken.push_back(src[i]);
+				return RetError(error, "\nerror: " + braceToken
+								+ ": matrix variable in function equation is not supported:",
+								i + errorPrefix.size(), errorPrefix + src);
+			}
 		}
 	}
 	return 1;

@@ -14,16 +14,18 @@ int Matrix::Parse() {
 	//Column calculation for first time
 	bool columnCalc = false;
 
+	//Set row and column as zero
+	row = 0; column = 0;
 	//Set token for regular expression solver
 	pol.setToken(token);
 	//Pass whitespaces
 	while (std::isspace(matrix[i])) ++i;
 	//Check if symbol is a left squarebrace. If it's
 	//not, error returns;
-	if (matrix[i] != '[')
+	if (matrix[i++] != '[')
 		return RetError("\nerror: there should be left squarebrace", i, matrix);
 	++brace;
-	for (i = 0; i < matrix.size(); ++i) {
+	for ( ; i < matrix.size(); ++i) {
 		//Passing whitespaces
 		while (std::isspace(matrix[i])) ++i;
 		//Parsing row
@@ -42,7 +44,7 @@ int Matrix::Parse() {
 				//Pass whitespaces
 				while (std::isspace(matrix[i])) ++i;
 				//find position of next non-digit
-				i = matrix.find(",]", i);
+				i = matrix.find_first_of(",]", i);
 				//If there is no comma, return error
 				if (i == std::string::npos)
 					return RetError("\nerror: there should be comma character or right squarebrace", prev + 1, matrix);
@@ -50,12 +52,12 @@ int Matrix::Parse() {
 				//If character is squarebrace
 				if (matrix[i] == ']') {
 					//Parse number
-					pol.setInfixExpr(matrix.substr(prev, i));
+					pol.setInfixExpr(matrix.substr(prev, i - prev));
 					//Check is string contain any information
 					//If it doesn't, return error
 					if (pol.getPosfixExpr().empty())
 						RetError("\nerror: there is no information whatsoever", i, matrix);
-					--brace;
+					//--brace;
 					++rowElems;
 					//If there was no elements in a row, return error
 					//if (!rowElems)
@@ -71,11 +73,17 @@ int Matrix::Parse() {
 					//return error
 					if (column != rowElems)
 						return RetError("\nerror: number of columns are not the same in current matrix", i, matrix);
+					//If there is error, stop parsing and return it
+					if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return 0; }
+					//Push value to matrix, if there was error due calculation, return it
+					aux = pol.CalcIt();
+					if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return 0; }
+					values.push_back(aux);
 					break ;
 				}
 				//aux = matrix.substr(prev, i);
 				//Parse number
-				pol.setInfixExpr(matrix.substr(prev, i));
+				pol.setInfixExpr(matrix.substr(prev, i - prev));
 				//Check is string contain any information
 				//If it doesn't, return error
 				if (pol.getPosfixExpr().empty())
@@ -83,19 +91,23 @@ int Matrix::Parse() {
 				//If there is error, stop parsing and return it
 				if (!pol.getErrMsg().empty())
 					{ error = pol.getErrMsg(); return 0; }
-				//Push number to vector
-				values.push_back(pol.CalcIt());
+				//Push number to vector, if there was error due calculation return it
+				aux = pol.CalcIt();
+				if (!pol.getErrMsg().empty())
+					{ error = pol.getErrMsg(); return 0; }
+				values.push_back(aux);
 				//Pass whitespaces
 				//while (std::isspace(matrix[i])) ++i;
 				//Check if it's comma. If it's not, return error
 				++i;
 				++rowElems;
 			}
+			++i;
 			--brace;
 			//Pass whitespaces
 			while (std::isspace(matrix[i])) ++i;
 			//If character is not semicolon or right squarebrace, return error
-			if (matrix[i] != ';' || matrix[i] != ']')
+			if (matrix[i] != ';' && matrix[i] != ']')
 				return RetError("\nerror: there should be semicolon or right squarebrace", i, matrix);
 			//If we deal with final right squarebrace, break the loop
 			else if (matrix[i] == ']') {
@@ -111,6 +123,9 @@ int Matrix::Parse() {
 		//of left squarebraces return error
 		else if (matrix[i] == ']' && !brace)
 			return RetError("\nerror: number right squarebraces is greater than left", i, matrix);
+		//If no info was presented in matrix, return error
+		else if (matrix[i] == ']' && values.empty())
+			return RetError("\nerror: there is no information in matrix whatsoever", i, matrix);
 		//If there is any other character return error
 		else
 			return RetError("\nerror: some obscure character found", i, matrix);
@@ -177,7 +192,7 @@ Matrix::Matrix(const std::string &src,
 			return ;
 		}
 	}
-	// If there is return error
+	//If there is error return it
 	//Let's parse source string. If there is some error
 	//assign error string to result and exit constructor.
 	//Else, generate result string
@@ -187,11 +202,13 @@ Matrix::Matrix(const std::string &src,
 		output = error;
 		return ;
 	}
+	//Values iterator
+	int valIt = 0;
 	//Generating output string in other case
 	for (int i = 0; i < row; ++i) {
 		output.append("[ ");
 		for (int j = 0; j < column; ++j) {
-			output.append(values[i + j]);
+			output.append(values[valIt++]);
 			output.append((j == column - 1) ? " ]\n" : " , ");
 		}
 	}
@@ -204,14 +221,17 @@ Matrix::Matrix(const std::vector<std::string> &src,
 		   values(src), token(tokenSrc), tokenIsMatrix(tokenIsMatrixSrc) {
 	//matrix.push_back('['); output.push_back('[');
 	matrix.append("[ ");
+	//values iterator
+	int valIt = 0;
+
 	for (int i = 0; i < row; ++i) {
 		matrix.append("[ ");
 		output.append("[ ");
 		for (int j = 0; j < column; ++j) {
-			matrix.append(values[i * row + column] + ((j == column - 1) ? " " : ", "));
-			output.append(values[i * row + column] + ((j == column - 1) ? " " : " , "));
+			matrix.append(values[valIt] + ((j == column - 1) ? " " : ", "));
+			output.append(values[valIt++] + ((j == column - 1) ? " " : " , "));
 		}
-		matrix.append(((i == row - 1) ? "] ]": "]; "));
+		matrix.append(((i == row - 1) ? "] ]": "] ; "));
 		output.append("]\n");
 	}
 }
@@ -254,11 +274,13 @@ void Matrix::setMatrix(const std::string &src,
 		output = error;
 		return ;
 	}
+	//Values iterator
+	int valIt = 0;
 	//Generating output string in other case
 	for (int i = 0; i < row; ++i) {
 		output.append("[ ");
 		for (int j = 0; j < column; ++j) {
-			output.append(values[i + j]);
+			output.append(values[valIt++]);
 			output.append((j == column - 1) ? " ]\n" : " , ");
 		}
 	}
