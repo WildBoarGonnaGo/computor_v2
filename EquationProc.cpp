@@ -51,7 +51,11 @@ void EquationProc::AddEquation(std::string &&equation) {
 		//If we deal with matricies calculate is as matrix
 		if (isMatrix) {
 			MatrixCalc calc(funcs, matricies, sample);
-			//If there is some error, return it
+			//If there is some error due parsing, return it
+			if (!calc.getError().empty()) history.push_back(calc.getError());
+			//If there is some error due calculation return it,
+			//else calculate it
+			sample = calc.CalcIt();
 			if (!calc.getError().empty()) history.push_back(calc.getError());
 			else history.push_back(calc.getCalcResult());
 			return ;
@@ -199,7 +203,7 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 	//Equation string
 	std::string eq;
 	//Set of base matrix functions
-	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "l1norm", "l2norm", "det", "adj" };
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
 	//Seeking name of variables (function) and name of token
 	//passing whitespaces
 	auto indx = [](const std::string &src, std::string &dst, int i) {
@@ -367,7 +371,7 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 	//Base functions for regular expressions
 	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
 	//Base functions for matricies
-	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "l1norm", "l2norm", "det", "adj" };
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
 	int count = 0, order = 0;
 	std::string parse;
 
@@ -394,11 +398,11 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 					return RetError(error, "\nerror: this is variable, not a function", i, src);
 				if (auto search = matricies.find(parse); search != matricies.end())
 					return RetError(error, "\nerror: this is a matrix, not a function", i, src);
-				if (auto search = funcs.find(parse); search == funcs.end())
-					return RetError(error, "\nerror: there is no such function", i, src);
 				//If some matrix function is found, we deal with matricies
 				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end())
 					isMatrix = true;
+				else if (auto search = funcs.find(parse); search == funcs.end())
+					return RetError(error, "\nerror: there is no such function", i, src);
 			} else {
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
 					return RetError(error, "\nerror: this is function, not a variable", i, src);
@@ -408,18 +412,15 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 					return RetError(error, "\nerror: this is function, not a variable", i, src);
 				if (auto search = vars.find(parse); search == vars.end() && !token.empty())
 					return RetError(error, "\nerror: there is no such variable", i, src);
-				else if (auto search = vars.find(parse); search == vars.end() && token.empty())
-					token = parse;
 				//If some matrix is found, we deal with matricies
 				else if (auto search = matricies.find(parse); search != matricies.end())
 					isMatrix = true;
+				else if (auto search = vars.find(parse); search == vars.end() && token.empty())
+					token = parse;
 				else
 					src.replace(src.find(parse), parse.size(), vars[parse]);
 			}
 			parse.clear();
-			//If character is left or right squarebrace, we deal with matrix
-			if (src[i] == ']' || src[i] == '[')
-				isMatrix = true;
 		}
 		//If it's equal sign
 		else if (src[i] == '=') {
@@ -434,6 +435,9 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 			return RetError(error, "\nerror: wrong place of question mark", i, src);
 		//Else we increment order variable
 		else if (src[i] == '?') ++order;
+		//If character is left or right squarebrace, we deal with matrix
+		else if (src[i] == ']' || src[i] == '[')
+			isMatrix = true;
 	}
 	return (order == 4) ? 1 : 2;
 }
@@ -445,7 +449,7 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 	//Set of base functions for regular values
 	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
 	//Set of base functions for matricies
-	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "l1norm", "l2norm", "det", "adj" };
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
 
 	for (int i = 0; i < src.size(); ++i) {
 		if (std::isalpha(src[i])) {
@@ -466,6 +470,8 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 									i + errorPrefix.size(), errorPrefix + src);
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
 					{ parse.clear(); continue ; }
+				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end() && !isFunc)
+					{ isMatrix = true; parse.clear(); continue ; }
 				if (auto search = funcs.find(parse); search == funcs.end())
 					return RetError(error, "\nerror: there is no such function: " + parse,
 									i + errorPrefix.size(), errorPrefix + src);

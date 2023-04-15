@@ -328,7 +328,7 @@ void MatrixCalc::StrMultiplySearch(std::string &src, const std::string &token) {
 MatrixCalc::MatrixCalc(std::map<std::string, Func> &funcsSrc,
 		   std::map<std::string, Matrix> &matriciesSrc,
 		   const std::string &src, const std::string &tokenSrc) : funcs(funcsSrc), matricies(matriciesSrc),
-		   infixEq(src), baseOpers("+-*/%^"), token(tokenSrc) {
+		   infixEq(src), baseOpers("+-*/%^~"), token(tokenSrc) {
 	//Set priorities for functions
 	operPriority["("] = 0;
 	operPriority["+"] = 1;
@@ -341,7 +341,7 @@ MatrixCalc::MatrixCalc(std::map<std::string, Func> &funcsSrc,
 
 	//Set of base functions
 	baseFuncsReg = { "sin", "cos", "tan", "exp", "sqrt", "abs" } ;
-	baseFuncsMatrix = { "inv", "transp", "l1norm", "l2norm", "det", "adj" };
+	baseFuncsMatrix = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
 	//Set priority for base functions
 	for (std::string var : baseFuncsReg)
 		operPriority[var] = 4;
@@ -374,74 +374,15 @@ std::string MatrixCalc::CalcIt() {
 	for (std::list<value>::iterator it = postfixQueue.begin(); it != postfixQueue.end(); ++it) {
 		//Check whether if this is a operand, no matter if it's number, token or matrix
 		if (it->state) nums.push(*it);
-		/*if (std::isdigit(postfixExpr[i]) || postfixExpr[i] == '.') {
-			parser.clear();
-			std::string number = GetStringNumber(postfixExpr, i);
-			//Push processed number into the stack of operands
-			nums.push(number);
-		}
-			//check if this a complex number or not
-		else if (!parser.compare("i") && !std::isalpha(postfixExpr[i + 1])) {
-			nums.push(parser);
-			parser.clear();
-		}
-			//check whether this is a token or not
-		else if (!token.empty() && parser.size() == token.size() && !parser.compare(token)
-				 && !std::isalpha(postfixExpr[i + 1])) {
-			nums.push(parser);
-			parser.clear();
-		}*/
 		//check if function is in the list of user defined strings
 		else if (auto search = funcs.find(it->eq); !it->state && search != funcs.end()) {
-			//Check if nums is empty, if it is, return error
-			/*if (nums.empty()) {
-				error = "error: operands stack is empty";
-				calcResult.clear(); return calcResult;
-			}
-			value tmp = nums.top(); nums.pop();
-			nums.push(funcExecute(it->eq, tmp));
-			//If there was some error return it
-			if (nums.top().state == 4) {
-				finCalc = nums.top(); calcResult.clear(); return "";
-			};
-			parser.clear();*/
 			if (funcExprExec(it->eq, nums).state == 4) return "";
 		}
 		//Check if it's some base function operato
 		else if (auto search = baseFuncsMatrix.find(it->eq); !it->state && search != baseFuncsMatrix.end()) {
-			//Check whether stack is empty.  If there is none, we get zero value
-			//If there is some value we pop value from stack.
-			/*std::string tmp = (nums.empty()) ? 0 : nums.top();
-			if (!nums.empty()) nums.pop();
-			nums.push(RemoveTrailZeros(funcExecute(parser, tmp)));
-			if (calcError) return nums.top();
-			parser.clear();*/
-			//Check if nums is empty, if it is, return error
-			/*if (nums.empty()) {
-				error = "error: operands stack is empty";
-				calcResult.clear(); return calcResult;
-			}
-			value tmp = nums.top(); nums.pop();
-			nums.push(funcExecute(it->eq, tmp));
-			//If there was some error return it
-			if (nums.top().state == 4) {
-				finCalc = nums.top(); calcResult.clear(); return "";
-			}*/
 			if (funcExprExec(it->eq, nums).state == 4) return "";
-			//parser.clear();
 		}
 		else if (auto search = baseFuncsReg.find(it->eq); !it->state && search != baseFuncsReg.end()) {
-			//Check if nums is empty, if it is, return error
-			/*if (nums.empty()) {
-				error = "error: operands stack is empty";
-				calcResult.clear(); return calcResult;
-			}
-			value tmp = nums.top(); nums.pop();
-			nums.push(funcExecute(it->eq, tmp));
-			//If there was some error return it
-			if (nums.top().state == 4) {
-				finCalc = nums.top(); return "";
-			}*/
 			if (funcExprExec(it->eq, nums).state == 4) return "";
 			//parser.clear();
 		}
@@ -518,35 +459,6 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 	//result value
 	value res;
 
-	//if (var.state == 2) hasAlpha = std::find_if(var.eq.begin(), var.eq.end(), ifAlpha) != var.eq.end();
-	//If we got token
-	/*if (var.state == 3) {
-		//Search in matrix function set
-		if (matrixSearch != baseFuncsMatrix.end() || (search != funcs.end() && search->second.tokenIsMatrix == 1)) {
-			//If there is such matrix function, check if token is matrix
-			//and if it's not return error
-			if (!tokenIsMatrix) tokenIsMatrix = 1;
-			else if (tokenIsMatrix != 1) {
-				error = "error: " + var.eq + " should be a matrix";
-				res.state = 4; return res;
-			}
-			res.state = 3;
-			res.matrix.setToken(var.eq);
-			res.eq = oper + "(" + var.eq + ")";
-		}
-		//Search in regular function set
-		if (funcSearch != baseFuncsReg.end() || (search != funcs.end() && search->second.tokenIsMatrix == 2)) {
-			//If there is such regular function, check if token is regular expression
-			//and if it's not return error
-			if (!tokenIsMatrix) tokenIsMatrix = 2;
-			else if (tokenIsMatrix != 2) {
-				error = "error: " + var.eq + " should be a regular expresssion";
-				res.state = 4; return res;
-			}
-			res.state = 3;
-			res.matrix.setToken(var.eq);
-		}
-	}*/
 	//In case of basic matrix function
 	if (matrixSearch != baseFuncsMatrix.end()) {
 		//Check is variable a matrix, if it's not return error
@@ -554,9 +466,9 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			error = "error: " + oper + ": " + var.eq + "isn't a matrix";
 			res.state = 4; return res;
 		}
-		//{ "inv", "transp", "l1norm", "l2norm", "det", "adj" };
-		if (*matrixSearch == "l1norm") res = L1norm(var.matrix);
-		else if (*matrixSearch == "l2norm") res = L2norm(var.matrix);
+		//{ "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
+		if (*matrixSearch == "lonenorm") res = L1norm(var.matrix);
+		else if (*matrixSearch == "ltwonorm") res = L2norm(var.matrix);
 		else if (*matrixSearch == "transp") res = Transpose(var.matrix);
 		else if (*matrixSearch == "det") res = Det(var.matrix);
 		else if (*matrixSearch == "adj") res = Adj(var.matrix);
@@ -600,33 +512,10 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 		res.eq = pol.CalcIt();
 		res.state = 1;
 	}
-	//if (hasAlpha && search == userDefFuncs.end()) return oper + "(" + var + ")";
-	//else if (hasAlpha && search != userDefFuncs.end()) return UDfuncExpose(search->second, var);
-
-	/*if (search != userDefFuncs.end()) {
-		std::string calc = UDfuncExpose(search->second, var);
-		return RevPolNotation(std::move(calc), userDefFuncs).CalcIt();
-	}
-	if (!oper.compare("sin")) res = std::sinl(std::stold(var));
-	else if (!oper.compare("cos")) res = std::cosl(std::stold(var));
-	else if (!oper.compare("tan")) {
-		if (!var.compare("1.570796")) {
-			calcError = true;
-			return "error: tan(pi/2) if undefined value";
-		}
-		if (!var.compare("4.712389")) {
-			calcError = true;
-			return "error: tan(3*pi/2) if undefined value";
-		}
-		res = std::tan(std::stod(var));
-	}
-	else if (!oper.compare("exp")) res = std::expl(std::stold(var));
-	else if (!oper.compare("sqrt")) res = std::sqrtl(std::stold(var));
-	else if (!oper.compare("abs")) res = std::abs(std::stold(var));*/
 	return res;
 }
 
-//Return l1norm value result
+//Return lonenorm value result
 MatrixCalc::value MatrixCalc::L1norm(const Matrix &matrix) {
 	//Result value
 	value res;
@@ -637,7 +526,7 @@ MatrixCalc::value MatrixCalc::L1norm(const Matrix &matrix) {
 
 	//If matrix is not a vector return error
 	if (matrix.getRow() != 1 && matrix.getColumn() != 1) {
-		error = "error: l1norm: " + matrix.getMatrix() + " is not a vector";
+		error = "error: lonenorm: " + matrix.getMatrix() + " is not a vector";
 		res.state = 4; return res;
 	}
 	res.state = 2;
@@ -660,7 +549,7 @@ MatrixCalc::value MatrixCalc::L1norm(const Matrix &matrix) {
 	return res;
 }
 
-//Return l2norm value result
+//Return ltwonorm value result
 MatrixCalc::value MatrixCalc::L2norm(const Matrix &matrix) {
 	//Result value
 	value res;
@@ -671,7 +560,7 @@ MatrixCalc::value MatrixCalc::L2norm(const Matrix &matrix) {
 
 	//If matrix is not a vector return error
 	if (matrix.getRow() != 1 && matrix.getColumn() != 1) {
-		error = "error: l1norm: " + matrix.getMatrix() + " is not a vector";
+		error = "error: lonenorm: " + matrix.getMatrix() + " is not a vector";
 		res.state = 4; return res;
 	}
 	res.state = 2;
@@ -681,7 +570,7 @@ MatrixCalc::value MatrixCalc::L2norm(const Matrix &matrix) {
 	expression.append("sqrt(");
 	for (int i = 0; i < targetValues.size(); ++i)
 		expression.append("(" + targetValues[i] + ")^2"
-			+ ((i == targetValues.size() - 1) ? "" : " + "));
+			+ ((i == targetValues.size() - 1) ? ")" : " + "));
 	//Calculate expression
 	parser.setToken(token);
 	parser.setInfixExpr(std::move(expression));
@@ -707,8 +596,8 @@ MatrixCalc::value MatrixCalc::Transpose(const Matrix &matrix) {
 	value res;
 
 	//copy info into transpose matrix
-	for (int i = 0; i < column; ++i) {
-		for (int j = 0; j < row; ++j)
+	for (int i = 0; i < row; ++i) {
+		for (int j = 0; j < column; ++j)
 			resVector.push_back(src[j * row + i]);
 	}
 	res.state = 1;
@@ -872,6 +761,11 @@ MatrixCalc::value MatrixCalc::Adj(const Matrix &src) {
 			error = pol.getErrMsg();
 			res.state = 4; return res;
 		}
+		values[c] = pol.CalcIt();
+		if (!pol.getErrMsg().empty()) {
+			error = pol.getErrMsg();
+			res.state = 4; return res;
+		}
 	}
 	//Generate result matrix and transpose it
 	res.matrix = Matrix(values, n, n, token);
@@ -929,7 +823,7 @@ MatrixCalc::value MatrixCalc::Inv(const Matrix &src) {
 		if (errorPreview(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
 	}
 	//Generate matrix and return it
-	res.state = 2;
+	res.state = 1;
 	res.matrix = Matrix(invValues, n, n, token);
 	return res;
 }
@@ -1191,9 +1085,9 @@ MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
 	std::string factor = pol.CalcIt();
 	if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
 	//Result values vector
-	std::vector<std::string> values;
+	std::vector<std::string> values(s.matrix.getValues().size());
 	//Multiply every element of second matrix and factor
-	for (int i = 0; i < s.matrix.getMatrix().size(); ++i) {
+	for (int i = 0; i < s.matrix.getValues().size(); ++i) {
 		//Multiplication calculator. If error occured, return it
 		pol.setInfixExpr("(" + factor + ") * (" + s.matrix.getValues()[i] + ")");
 		if (ErrorCheck(pol.getErrMsg(), error).state == 4) { res.state = 4; return res; }
@@ -1212,7 +1106,7 @@ MatrixCalc::value MatrixCalc::MatrixPowerRaise(const value &f, const value &s) {
 	value res;
 
 	//If matrix is not square return error
-	if (f.matrix.getColumn() != s.matrix.getRow()) {
+	if (f.matrix.getColumn() != f.matrix.getRow()) {
 		error = "error: '^': " + f.matrix.getMatrix()
 				+ ": for proper power raising matrix should be squared.";
 		res.state = 4; return res;
@@ -1243,7 +1137,7 @@ MatrixCalc::value MatrixCalc::MatrixPowerRaise(const value &f, const value &s) {
 	res = f;
 	//Matrix raising. In case of error, return it
 	for (int i = 1; i < bound; ++i) {
-		res = MatrixMulti(res.matrix, res.matrix);
+		res = MatrixMulti(res.matrix, f.matrix);
 		if (res.state == 4) return res;
 	}
 	return res;

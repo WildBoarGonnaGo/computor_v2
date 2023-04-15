@@ -112,6 +112,23 @@ int main(void) {
 	proc.AddEquation("> varI = varG - varH");
 	proc.AddEquation("> varJ = [[-1, -2, 7] ; [4, 9, 0]]");
 	proc.AddEquation("> 3 * varJ = ?");
+	proc.AddEquation("> -5 * varJ = ?");
+	proc.AddEquation("> -varJ = ?");
+	proc.AddEquation("> varK = [[-1, 2, -3, 0];[5,4,-2,1];[-8,11,-10,-5]]");
+	proc.AddEquation("> varL = [[-9,3];[6,20];[7,0];[12,-4]]");
+	proc.AddEquation("> varK * varL = ?");
+	proc.AddEquation("> [[6,3];[-17,-2]] * [[4,9];[-6,90]] = ?");
+	proc.AddEquation("> transp([[-1,2,4,0,7];[3,-5,24,9,-3];[-10,-8,-2,-4,11]]) = ?");
+	proc.AddEquation("> [[1,2];[-1,-3]] ^ 2 = ?");
+	proc.AddEquation("> [[1,2];[-1,-3]] ^ 6 = ?");
+	proc.AddEquation("> varJ = [[1, 0, -1, 2];[3,-2,5,0];[-1,4,-3,6]]");
+	proc.AddEquation("> varK = [[-9,1,0];[2,-1,4];[0,-2,3];[1,5,0]]");
+	proc.AddEquation("> varL = [[-5, -20, 13];[10,12,9];[3,-15,8]]");
+	proc.AddEquation("> 2 * varJ * varK - 3 * transp(varL) + 7 * [[1,0,0];[0,1,0];[0,0,1]] = ?");
+	proc.AddEquation("> varM = lonenorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]])");
+	proc.AddEquation("> varM = ltwonorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]])");
+	proc.AddEquation("> varM = det(varL)");
+	proc.AddEquation("> inv(varL) = ?");
 
 	//History of operations output
 	std::cout << "History of operations:" << std::endl;
