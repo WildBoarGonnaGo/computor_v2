@@ -2,6 +2,7 @@
 # define EQUATIONPROC_H
 #include "RevPolNotation.h"
 #include "Matrix.h"
+#include "gnuplot-iostream.h"
 #include <map>
 
 class EquationProc {
@@ -23,6 +24,8 @@ class EquationProc {
 	bool oldValueIsMatrix;
 	//Equation string in case of function or regular variable
 	std::string regEqStr;
+	//Plotter driver
+	Gnuplot gp;
 
 	//Method to define string represents a variable or a function
 	//it returns integer value represents next states: 1 - we're dealing with variable
@@ -49,11 +52,12 @@ class EquationProc {
 	int RetError(std::string &error, const std::string &errMsg,
 				 const int &i, const std::string &src);
 	//In case of expression error, push it to history, output to error stream
-	// and return, else just return 1
+	//and return, else just return 1
 	int RetExprError(const std::string &error);
+	//Expose radian function for plotting function
+	void PlotExposeRad(std::string &src);
 public:
 	EquationProc();
-	//EquationProc(std::string &&equation);
 	//Add equation: either function or variable, or some equation.
 	void AddEquation(std::string &&equation);
 	//Output operation history into the output stream
@@ -62,6 +66,8 @@ public:
 	void VariablesOutput();
 	//Plotting function
 	void PlotFunction(const std::string &src);
+	//Push to history
+	void PushToHistory(const std::string &src);
 };
 
 #endif

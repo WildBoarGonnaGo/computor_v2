@@ -93,11 +93,15 @@ class RevPolNotation {
 	std::string	ProcessPostfix();
 	//Removing trailing zeros in string
 	std::string RemoveTrailZeros(const std::string &str);
+	//Converting degrees to radians
+	long double ToRadians(const long double &val);
 public:
 	RevPolNotation() = delete;
 	RevPolNotation(std::map<std::string, Func> &userDefFuncsRef);
 	RevPolNotation(std::string &&init_expr, std::map<std::string, Func> &userDefFuncsRef);
+	//Get infix notation
 	const std::string	&getInifixExpr();
+	//Get postfix notation
 	const std::string	&getPosfixExpr();
 
 	//Set new infix expression for further calculations

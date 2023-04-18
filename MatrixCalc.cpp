@@ -4,6 +4,7 @@
 
 #include "MatrixCalc.h"
 #include <cmath>
+#include <cstring>
 
 //Get double number from string
 std::string	MatrixCalc::GetStringNumber(const std::string &str, int &i) {
@@ -76,14 +77,7 @@ void MatrixCalc::ProcessPostfix() {
 	int						funcBrace = 0;
 	//Data queue control
 	bool					number = false;
-	//lambda function. It marks error place
-	/*auto MarkError = [](const std::string &src, int i) {
-		std::string res = src;
-		res.push_back('\n');
-		res.insert(res.size(), i, ' ');
-		res.push_back('^');
-		return res;
-	};*/
+
 	//Parsing string
 	for (int i = 0; i < infixEq.size(); ++i) {
 		//If character is digit
@@ -513,6 +507,89 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 		res.state = 1;
 	}
 	return res;
+}
+
+//Return norm of p degree
+void MatrixCalc::LPnorm() {
+	//Expression calculator
+	RevPolNotation pol(funcs);
+
+	while (infixEq.find("lpnorm") != std::string::npos) {
+		//position iterator
+		int pos = infixEq.find("lpnorm") + std::strlen("lpnorm");
+
+		//If in 'pos' position there is no brace
+		//return error
+		if (infixEq[pos] != '(') {
+			error = MarkError(infixEq, pos) + "\nerror: there should be brace";
+			return ;
+		}
+		//start position of inner contains of 'lpnorm'
+		//function
+		int begin = ++pos;
+		//number of braces
+		int brace = 1;
+		for ( ; pos < infixEq.size(); ++pos) {
+			if (infixEq[pos] == '(') ++brace;
+			else if (infixEq[pos] == ')') --brace;
+			if (!brace) break;
+		}
+		//If number of braces doesn't fit return error
+		if (brace) {
+			--begin;
+			error = MarkError(infixEq, begin) + "\nerror: wrong number of braces";
+			return ;
+		}
+		//position of end of 'lpnorm' function
+		int end = pos;
+		//If there is no comma character, return error
+		if (infixEq.find(',', begin) == std::string::npos) {
+			error = MarkError(infixEq, begin) + "\nerror: wrong number of braces";
+			return ;
+		}
+		pos = infixEq.find(',', begin);
+		//Matrix for calculation
+		Matrix m;
+		//Matrix index parser
+		int mi = begin;
+		//Passing whitespaces
+		while (std::isspace(infixEq[mi])) ++mi;
+		//Matrix variable string
+		std::string matVar;
+		//If we deal with variable, assign to matrix 'm'
+		//If there is no such variable, return error
+		while(std::isalpha(infixEq[mi])) matVar.push_back(infixEq[mi++]);
+		if (!matVar.empty()) {
+			if (auto search = matricies.find(matVar); search != matricies.end())
+				m = matricies[matVar];
+			else {
+				error = MarkError(infixEq, mi) + "error: matricies: there is no such variable";
+				return ;
+			}
+		}
+		//If it's not a variable, let's parse first attribute of 'lpnorm' function
+		else m.setMatrix(infixEq.substr(begin, pos++ - begin - 1), funcs, matricies);
+		if (!m.getError().empty()) { error = m.getError(); return ; }
+		//If matrix isn't a vector (it's row or column should only one)
+		//return error
+		if (m.getRow() != 1 && m.getColumn() != 1) {
+			error = "error: lpnorm: " + m.getMatrix() + ": this matrix isn't vector";
+			return ;
+		}
+		//Let's calculate power value, in case of error
+		//return it
+		matVar = infixEq.substr(pos, end - pos - 1);
+		pol.setInfixExpr(std::move(matVar));
+		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return ; }
+		matVar = pol.CalcIt();
+		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return ; }
+
+	}
+}
+
+//Return infinite norm
+MatrixCalc::value MatrixCalc::LInfNorm(const Matrix &matrix) {
+
 }
 
 //Return lonenorm value result

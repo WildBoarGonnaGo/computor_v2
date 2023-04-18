@@ -2,9 +2,10 @@
 #include "computor.h"
 #include "MatrixCalc.h"
 #include <iostream>
-#include "gnuplot-iostream.h"
 
-EquationProc::EquationProc() { }
+EquationProc::EquationProc() {
+	gp << "set term wxt title \"lchantel - computorv2\"" << std::endl;
+}
 
 //Add equation: either function or variable, or some equation.
 void EquationProc::AddEquation(std::string &&equation) {
@@ -20,7 +21,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 	//Lambda function. it returns position if there is some base function
 	//else it returns -1
 	auto ifBaseFuncIn = [](const std::string &src, std::string &error) {
-		std::set<std::string> baseFuncs = {"sin", "cos", "tan", "exp", "sqrt", "abs"};
+		std::set<std::string> baseFuncs = {"sin", "cos", "tan", "exp", "sqrt", "abs", "rad"};
 		for (std::set<std::string>::iterator it = baseFuncs.begin(); it != baseFuncs.end(); ++it) {
 			int search = src.find(*it);
 			if (search != std::string::npos) {
@@ -32,6 +33,8 @@ void EquationProc::AddEquation(std::string &&equation) {
 	};
 
 	history.push_back(std::move(equation));
+	if (equation.find('>') == std::string::npos)
+		history.back().insert(0, ">> ");
 	sample = history.back().substr(history.back().find_first_not_of("	> "));
 	if (EqualSignsNum(sample, equalSignPos) != 1) {
 		history.push_back("error: equation must have only one equal sign");
@@ -54,16 +57,8 @@ void EquationProc::AddEquation(std::string &&equation) {
 		//If we deal with matricies calculate is as matrix
 		if (isMatrix) {
 			MatrixCalc calc(funcs, matricies, sample);
-			//If there is some error due parsing, return it
-			//if (!calc.getError().empty()) history.push_back(calc.getError());
 			if (!(RetExprError(calc.getError()))) return ;
-			//If there is some error due calculation return it,
-			//else calculate it
 			sample = calc.CalcIt();
-			/*if (!calc.getError().empty()) {
-				history.push_back(calc.getError());
-				std::cerr << history.back() << std::endl;
-			}*/
 			if (!(RetExprError(calc.getError()))) return ;
 			else {
 				history.push_back(calc.getCalcResult());
@@ -87,7 +82,6 @@ void EquationProc::AddEquation(std::string &&equation) {
 			return ;
 		}
 		//Result parsed equation
-		//std::string res, aux;
 		int delim = sample.find('=');
 		while (sample[delim] == '=' || std::isspace(sample[delim])) --delim;
 		//Left part of source equation
@@ -146,15 +140,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 		//Calculate expression, in case of error return it
 		parser.setInfixExpr(std::move(sample));
 		if (!(RetExprError(parser.getErrMsg()))) return ;
-		/*if (!parser.getErrMsg().empty()) {
-			history.push_back(parser.getErrMsg());
-			return ;
-		}*/
 		vars[entityName] = parser.CalcIt();
-		/*if (!parser.getErrMsg().empty()) {
-			history.push_back(parser.getErrMsg());
-			return ;
-		}*/
 		if (!(RetExprError(parser.getErrMsg()))) return ;
 		history.push_back(vars[entityName]);
 		std::cout << history.back() << std::endl;
@@ -166,10 +152,6 @@ void EquationProc::AddEquation(std::string &&equation) {
 		if (!(RetExprError(parser.getErrMsg()))) return ;
 		funcs[entityName].equation = parser.CalcIt();
 		if (!(RetExprError(parser.getErrMsg()))) return ;
-		/*if (funcs[entityName].equation.empty() && !parser.getErrMsg().empty()) {
-			funcs.erase(entityName);
-			history.push_back(parser.getErrMsg());
-		}*/
 		history.push_back(funcs[entityName].equation);
 		std::cout << history.back() << std::endl;
 	}
@@ -302,8 +284,8 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 							"\nerror: " + res + ": matricies function and variable in function is not supported",
 							i, src);
 		}
-		//funcs[res].equation = src.substr(src.find_first_not_of(" =	", i));
 		funcs[res].equation = eq;
+		funcs[res].isMatrix = isMatrix;
 		regEqStr = funcs[res].equation;
 		return 2;
 	}
@@ -346,7 +328,7 @@ int EquationProc::EqualSignsNum(const std::string &src, int &equalSignPos) {
 
 //Private method. It parse computational string
 int EquationProc::ParseComputeStr(std::string &src, std::string &error) {
-	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
+	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
 	std::string parse;
 	for (int i = 0; i < src.size(); ++i) {
 		if (std::isalpha(src[i])) {
@@ -399,6 +381,27 @@ int EquationProc::RetExprError(const std::string &error) {
 	}
 	return 1;
 }
+//Expose radian function for plotting function
+void EquationProc::PlotExposeRad(std::string &src) {
+	//until there will be no 'rad' function in source
+	//string, exchange it
+	while (src.find("rad") != std::string::npos) {
+		//parser index, position of equation beginning
+		//and brace count
+		int i = src.find("rad") + 4, brace = 1;
+		int begin = i;
+		//string for exchange
+		std::string exch;
+
+		while (brace) {
+			if (src[i] == '(') ++brace;
+			else if (src[i] == ')') --brace;
+			++i;
+		}
+		exch = "pi * (" + src.substr(begin, i - begin - 1) + ") / 180";
+		src.replace(src.find("rad"), i - src.find("rad"), exch);
+	}
+}
 
 /*Private submethod. It calculate number of question marks in
 source string. If number is greater than 1, we return 0.
@@ -409,7 +412,7 @@ the equal sign we return 1, if question is after equal sign
 and some piece of equation - return 2*/
 int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std::string &token) {
 	//Base functions for regular expressions
-	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
+	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
 	//Base functions for matricies
 	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
 	int count = 0, order = 0;
@@ -441,6 +444,9 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 				//If some matrix function is found, we deal with matricies
 				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end())
 					isMatrix = true;
+				else if (auto search = baseFuncs.find(parse); search != baseFuncs.end()) {
+					parse.clear(); continue ;
+				}
 				else if (auto search = funcs.find(parse); search == funcs.end())
 					return RetError(error, "\nerror: there is no such function", i, src);
 			} else {
@@ -487,7 +493,7 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 									std::string &name, const std::string &oldValue) {
 	std::string parse, errorPrefix;
 	//Set of base functions for regular values
-	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
+	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
 	//Set of base functions for matricies
 	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
 	//Set error prefix, depends on if we deal with function or not
@@ -569,6 +575,7 @@ void EquationProc::HistoryOutput() {
 	for (std::string var : history)
 		std::cout << var << std::endl;
 }
+
 //Output list of all available variables
 void EquationProc::VariablesOutput() {
 	//Variables iterator
@@ -590,8 +597,6 @@ void EquationProc::VariablesOutput() {
 void EquationProc::PlotFunction(const std::string &src) {
 	 	//Function string for further plotting
         std::string toPlot = src;
-        //Plotter driver
-        Gnuplot gp;
         //index iterator and parser
         int parseIt;
         /*place of the character after left
@@ -604,6 +609,8 @@ void EquationProc::PlotFunction(const std::string &src) {
 		//error string message
 		std::string error;
 
+		history.push_back(toPlot);
+		history.back().insert(0, ">> ");
         parseIt = toPlot.find("plot") + 4;
         //Check is there is left squarebrace
         if (toPlot[parseIt] != '(') {
@@ -612,11 +619,6 @@ void EquationProc::PlotFunction(const std::string &src) {
         }
         begin = ++parseIt;
         ++braceNum;
-        while (toPlot.find("^") != std::string::npos) {
-                //'^' character position
-                int i = toPlot.find("^");
-                toPlot.replace(i, 1, "**");
-        }
         //Check is there right squarebrace, and there is none
         //return error
         for ( ; parseIt < toPlot.size(); ++parseIt) {
@@ -670,6 +672,25 @@ void EquationProc::PlotFunction(const std::string &src) {
 		//After parsing and calculating expression
 		//we should delete temporary 'plot' function
 		funcs.erase("plot");
+		//Change all power character '^' to their
+        //gnuplot alternative - '**'
+        while (toPlot.find("^") != std::string::npos) {
+                //'^' character position
+                int i = toPlot.find("^");
+                toPlot.replace(i, 1, "**");
+        }
+        //Exchange 'rad' function in function
+        //string, that should be plotted
+        PlotExposeRad(toPlot);
         //plot fixed string
-        gp << "plot " << toPlot.substr(begin, end - begin) << std::endl;
+        gp << "plot " << toPlot << std::endl;
+}
+
+//Push to history
+void EquationProc::PushToHistory(const std::string &src) {
+	//Result string
+	std::string res = src;
+
+	res.insert(0, ">> ");
+	history.push_back(res);
 }

@@ -146,7 +146,7 @@ std::string RevPolNotation::AlphaNum(const std::string &oper, const std::string 
 			return "";
 		}
 		ComplexMultiDivNum(lst, s, oper);
-		for (std::string elem : lst) strRes += elem + " ";//strRes += elem + ((elem.compare(lst.back()) ? " " : ""));
+		for (std::string elem : lst) strRes += elem + " ";
 		strRes.resize(strRes.size() - 1);
 	}
 	else if (!oper.compare("-") || !oper.compare("+")) {
@@ -187,11 +187,11 @@ std::string RevPolNotation::NumAlpha(const std::string &oper, const std::string 
 	else if (!oper.compare("-")) {
 		ComplexMultiDivNum(lst, "-1", "*");
 		ComplexSumSubtractNum(lst, f, "+");
-		for (std::string elem : lst) strRes += elem + " ";//strRes += ((!strRes.empty()) ?  : elem);
+		for (std::string elem : lst) strRes += elem + " ";
 		strRes.resize(strRes.size() - 1);
 	} else {
 		ComplexSumSubtractNum(lst, f, oper);
-		for (std::string elem : lst) strRes += elem + " ";//strRes += ((!strRes.empty()) ? elemComplex(elem) : elem);
+		for (std::string elem : lst) strRes += elem + " ";
 		strRes.resize(strRes.size() - 1);
 	}
 	return strRes;
@@ -254,7 +254,6 @@ std::string RevPolNotation::NumBracketing(const std::list<std::string> &lst) {
 std::list<std::string> RevPolNotation::PowLevel(const std::string &src) {
 	std::list<std::string> res;
 	std::string tmp, num, alpha;
-	//std::set<std::string> funcs = { "sin", "cos", "tan", "exp", "abs", "sqrt" };
 	std::set<std::string>::iterator it;
 	int size = 0;
 
@@ -595,6 +594,7 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 std::string RevPolNotation::UDfuncExpose(const Func &src, const std::string &forReplace) {
 	std::string res = src.equation;
 
+	if (forReplace == src.token) return res;
 	while(true) {
 		if (auto s = res.find(src.token); s != std::string::npos) {
 			res.replace(s, src.token.size(), forReplace);
@@ -635,6 +635,7 @@ std::string RevPolNotation::funcExecute(const std::string &oper, const std::stri
 	else if (!oper.compare("exp")) res = std::exp(std::stold(var));
 	else if (!oper.compare("sqrt")) res = std::sqrt(std::stold(var));
 	else if (!oper.compare("abs")) res = std::abs(std::stold(var));
+	else if (oper == "rad") res = ToRadians(std::stold(var));
 
 	return std::to_string(res);
 }
@@ -797,7 +798,6 @@ std::string		RevPolNotation::ProcessPostfix() {
 				else if (search != operPriority.end() && inifixExpr[i] == '(') {
 					oper.push(tmp); --i; ++funcBrace; continue ;
 				} else {
-					//std::cerr << "error: there should be open brace after function name" << std::endl;
 					errmsg = markPlace(inifixExpr, i) +
 							"\nerror: there should be open brace after function name";
 					res.clear(); return res;
@@ -854,6 +854,11 @@ std::string RevPolNotation::RemoveTrailZeros(const std::string &str) {
 	return res;
 }
 
+//Converting degrees to radians
+long double RevPolNotation::ToRadians(const long double &val) {
+	return val * M_PI / 180;
+}
+
 RevPolNotation::RevPolNotation(std::map<std::string, Func> &userDefFuncsRef) : baseOpers("+-/*^%~"), userDefFuncs(userDefFuncsRef) {
 	operPriority["("] = 0;
 	operPriority["+"] = 1;
@@ -864,7 +869,7 @@ RevPolNotation::RevPolNotation(std::map<std::string, Func> &userDefFuncsRef) : b
 	operPriority["^"] = 3;
 	operPriority["~"] = 5;
 
-	funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
+	funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
 	for (std::string var : funcs)
 		operPriority[var] = 4;
 }
@@ -882,7 +887,7 @@ RevPolNotation::RevPolNotation(std::string &&init_expr, std::map<std::string, Fu
 	operPriority["~"] = 5;
 
 	inifixExpr = std::move(init_expr);
-	funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
+	funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
 	for (std::string var : funcs)
 		operPriority[var] = 4;
 	if (!token.empty())
@@ -892,10 +897,13 @@ RevPolNotation::RevPolNotation(std::string &&init_expr, std::map<std::string, Fu
 	postfixExpr = ProcessPostfix();
 }
 
+//Get infix notation
 const std::string	&RevPolNotation::getInifixExpr() { return inifixExpr; }
 
+//Get postfix notation
 const std::string	&RevPolNotation::getPosfixExpr() { return postfixExpr; }
 
+//Set new infix expression for further calculations
 void				RevPolNotation::setInfixExpr(std::string &&move) {
 	calcError = false;
 	inifixExpr.clear(); postfixExpr.clear();
@@ -907,6 +915,7 @@ void				RevPolNotation::setInfixExpr(std::string &&move) {
 	postfixExpr = ProcessPostfix();
 }
 
+//Calculation of postfix equation
 std::string RevPolNotation::CalcIt() {
 	//Stack of operands
 	std::stack<std::string>		nums;

@@ -62,6 +62,10 @@ class MatrixCalc {
 	std::string MarkError(const std::string &src, int &i);
 	//Private method. It executes base and user defined functions
 	value funcExecute(const std::string &oper, const value &var);
+	//Return norm of p degree
+	void LPnorm();
+	//Return infinite norm
+	value LInfNorm(const Matrix &matrix);
 	//Return l1norm value result
 	value L1norm(const Matrix &matrix);
 	//Return l2norm value result
