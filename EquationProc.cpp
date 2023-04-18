@@ -2,6 +2,7 @@
 #include "computor.h"
 #include "MatrixCalc.h"
 #include <iostream>
+#include "gnuplot-iostream.h"
 
 EquationProc::EquationProc() { }
 
@@ -34,6 +35,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 	sample = history.back().substr(history.back().find_first_not_of("	> "));
 	if (EqualSignsNum(sample, equalSignPos) != 1) {
 		history.push_back("error: equation must have only one equal sign");
+		std::cerr << history.back() << std::endl;
 		return ;
 	}
 	//Check if there is some question mark
@@ -41,6 +43,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 	//If there is some error, push it to history and exit
 	if (!questMark) {
 		history.push_back(errMsg);
+		std::cerr << history.back() << std::endl;
 		return ;
 	}
 	//If we deal with simple computational part
@@ -52,16 +55,26 @@ void EquationProc::AddEquation(std::string &&equation) {
 		if (isMatrix) {
 			MatrixCalc calc(funcs, matricies, sample);
 			//If there is some error due parsing, return it
-			if (!calc.getError().empty()) history.push_back(calc.getError());
+			//if (!calc.getError().empty()) history.push_back(calc.getError());
+			if (!(RetExprError(calc.getError()))) return ;
 			//If there is some error due calculation return it,
 			//else calculate it
 			sample = calc.CalcIt();
-			if (!calc.getError().empty()) history.push_back(calc.getError());
-			else history.push_back(calc.getCalcResult());
+			/*if (!calc.getError().empty()) {
+				history.push_back(calc.getError());
+				std::cerr << history.back() << std::endl;
+			}*/
+			if (!(RetExprError(calc.getError()))) return ;
+			else {
+				history.push_back(calc.getCalcResult());
+				std::cout << history.back() << std::endl;
+			}
 			return ;
 		}
 		parser.setInfixExpr(std::move(sample));
+		if (!(RetExprError(parser.getErrMsg()))) return ;
 		history.push_back(parser.CalcIt());
+		std::cout << history.back() << std::endl;
 		return ;
 	}
 	//If we deal with complex computational part
@@ -84,24 +97,30 @@ void EquationProc::AddEquation(std::string &&equation) {
 		delim = rightEq.size();
 		while (rightEq[delim - 1] == '?' || std::isspace(rightEq[delim - 1])) --delim;
 		rightEq.resize(delim);
-		//Parse left and right equations
+		//Parse left and right equations and in case of error
+		//return it
 		parser.setToken(curToken);
 		parser.setInfixExpr(std::move(leftEq));
+		if (!(RetExprError(parser.getErrMsg()))) return ;
 		leftEq = parser.CalcIt();
-		//if (ifBaseFuncIn(leftEq, errMsg)) { history.push_back(errMsg); return ; }
+		if (!(RetExprError(parser.getErrMsg()))) return ;
 		parser.setInfixExpr(std::move(rightEq));
+		if (!(RetExprError(parser.getErrMsg()))) return ;
 		rightEq = parser.CalcIt();
+		if (!(RetExprError(parser.getErrMsg()))) return ;
 		leftEq.append(" = ");
 		leftEq.append(rightEq);
 		//Check if equation has some base function
 		if ((delim = ifBaseFuncIn(leftEq, errMsg)) != -1) {
 			RetError(errMsg, std::string(errMsg), delim, leftEq);
 			history.push_back(errMsg);
+			std::cerr << history.back() << std::endl;
 			return;
 		}
 		//let's solve equation
  		computor solve(leftEq, curToken);
 		history.push_back(solve.to_string());
+		std::cout << history.back() << std::endl;
 		return ;
 	}
 	//Parsing variable or function
@@ -119,43 +138,40 @@ void EquationProc::AddEquation(std::string &&equation) {
 	//Check error in equations, and if there are, return it
 	if (!InitEquationParse(sample, errMsg, entityName, oldValue)) {
 		history.push_back(errMsg);
+		std::cerr << history.back() << std::endl;
 		return ;
 	}
 	//Variable case calculation
 	else if (state == 1) {
-		//sample = vars[entityName];
-		/*if (!InitEquationParse(sample, errMsg, 0, entityName, oldValue)) {
-			history.push_back(errMsg);
-			return ;
-		}*/
 		//Calculate expression, in case of error return it
 		parser.setInfixExpr(std::move(sample));
-		if (!parser.getErrMsg().empty()) {
+		if (!(RetExprError(parser.getErrMsg()))) return ;
+		/*if (!parser.getErrMsg().empty()) {
 			history.push_back(parser.getErrMsg());
 			return ;
-		}
+		}*/
 		vars[entityName] = parser.CalcIt();
-		if (!parser.getErrMsg().empty()) {
+		/*if (!parser.getErrMsg().empty()) {
 			history.push_back(parser.getErrMsg());
 			return ;
-		}
+		}*/
+		if (!(RetExprError(parser.getErrMsg()))) return ;
 		history.push_back(vars[entityName]);
+		std::cout << history.back() << std::endl;
 	}
 	//Function case calculation
 	else if (state == 2) {
 		parser.setToken(funcs[entityName].token);
-		//sample = funcs[entityName].equation;
-		/*if (!InitEquationParse(sample, errMsg, 1, entityName, oldValue)) {
-			history.push_back(errMsg);
-			return ;
-		}*/
 		parser.setInfixExpr(std::move(sample));
+		if (!(RetExprError(parser.getErrMsg()))) return ;
 		funcs[entityName].equation = parser.CalcIt();
-		if (funcs[entityName].equation.empty() && !parser.getErrMsg().empty()) {
+		if (!(RetExprError(parser.getErrMsg()))) return ;
+		/*if (funcs[entityName].equation.empty() && !parser.getErrMsg().empty()) {
 			funcs.erase(entityName);
 			history.push_back(parser.getErrMsg());
-		}
-		else history.push_back(funcs[entityName].equation);
+		}*/
+		history.push_back(funcs[entityName].equation);
+		std::cout << history.back() << std::endl;
 	}
 	//Matrix case calculation
 	else {
@@ -168,6 +184,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 			if (!oldValue.empty()) {
 				if (!oldValueIsMatrix) vars[entityName] = oldValue;
 			}
+			std::cerr << history.back() << std::endl;
 			return ;
 		}
 		//Calculate result, in case of calculation error, return it
@@ -177,6 +194,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 			if (!oldValue.empty()) {
 				if (!oldValueIsMatrix) vars[entityName] = oldValue;
 			}
+			std::cerr << history.back() << std::endl;
 			return ;
 		}
 		//If calculation was succesfull, check type of variable
@@ -190,6 +208,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 			matricies[entityName] = calc.getFinValue().matrix;
 			history.push_back(matricies[entityName].toString());
 		}
+		std::cout << history.back() << std::endl;
 	}
 }
 
@@ -217,6 +236,12 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 	};
 
 	i = indx(src, res, i);
+	//Using 'plot' name is not permitted, it's already
+	//taken for plotting function
+	if (res == "plot") {
+		return RetError(error, "\nerror: 'plot' name for function or variable is not permitted",
+						i, src);
+	}
 	if (src[i] == '(') {
 		isfunc = 1;
 		funcs[res] = func;//func.name = std::move(res);
@@ -238,7 +263,13 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 		return RetError(error, "\nerror: equal sign is not in proper place", i, src);
 	}
 	//Assigning equation string
-	eq = src.substr(src.find_first_not_of(" =", i));
+	eq = src.substr(src.find_first_not_of(" =	", i));
+	//Lets check if equation contains any information, and if it's not
+	//return error.
+	if (eq.empty()) {
+		if (isfunc) funcs.erase(res);
+		return RetError(error, "\nerror: actual expression is empty", i, src);
+	}
 	isMatrix = false;
 	//Search squarebraces in function or variable
 	//If there is, we deal with matrix, so set isMatrix variable as true
@@ -271,8 +302,8 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 							"\nerror: " + res + ": matricies function and variable in function is not supported",
 							i, src);
 		}
-		funcs[res].equation = src.substr(src.find_first_not_of(" =", i));
-		//funcs[res].isMatrix = isMatrix;
+		//funcs[res].equation = src.substr(src.find_first_not_of(" =	", i));
+		funcs[res].equation = eq;
 		regEqStr = funcs[res].equation;
 		return 2;
 	}
@@ -358,6 +389,15 @@ int EquationProc::RetError(std::string &error, const std::string &errMsg,
 	error.push_back('^');
 	error += errMsg;
 	return 0;
+}
+
+int EquationProc::RetExprError(const std::string &error) {
+	if (!error.empty()) {
+		history.push_back(error);
+		std::cerr << history.back() << std::endl;
+		return 0;
+	}
+	return 1;
 }
 
 /*Private submethod. It calculate number of question marks in
@@ -450,6 +490,8 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
 	//Set of base functions for matricies
 	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
+	//Set error prefix, depends on if we deal with function or not
+	errorPrefix = ((isFunc) ? name + "(" + funcs[name].token + ")" + " = " : name + " = ");
 
 	for (int i = 0; i < src.size(); ++i) {
 		if (std::isalpha(src[i])) {
@@ -458,7 +500,7 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 			if ((parse.size() == 1 && !parse.compare("i")) || (parse.size() == 2 && !parse.compare("pi")))
 				{ parse.clear(); continue ; }
 			if (src[i] == '(') {
-				errorPrefix =  name + "(" + funcs[name].token + ")" + " = ";
+				//errorPrefix =  name + "(" + funcs[name].token + ")" + " = ";
 				if (isFunc && parse.size() == name.size() &&!parse.compare(name))
 					return RetError(error, "\nerror: recursive function call is unexceptable!",
 									i + errorPrefix.size(), errorPrefix + src);
@@ -480,7 +522,7 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 									i + errorPrefix.size(), errorPrefix + src);
 			}
 			else {
-				errorPrefix = name + " = ";
+				//errorPrefix = name + " = ";
 				if (isFunc && funcs[name].token.size() == parse.size() && !funcs[name].token.compare(parse))
 					{ parse.clear(); continue; }
 				if (auto search = funcs.find(parse); search != funcs.end())
@@ -542,4 +584,92 @@ void EquationProc::VariablesOutput() {
 	std::cout << "Matricies:" << std::endl;
 	for ( ; itMap != matricies.end(); ++itMap)
 		std::cout << itMap->first << ':' << std::endl << itMap->second.toString();
+}
+
+//Plotting function
+void EquationProc::PlotFunction(const std::string &src) {
+	 	//Function string for further plotting
+        std::string toPlot = src;
+        //Plotter driver
+        Gnuplot gp;
+        //index iterator and parser
+        int parseIt;
+        /*place of the character after left
+        sbrace and place of the right brace*/
+        int begin, end;
+        //number of braces due parsing
+        int braceNum = 0;
+		//Expression calculator
+		RevPolNotation pol(funcs);
+		//error string message
+		std::string error;
+
+        parseIt = toPlot.find("plot") + 4;
+        //Check is there is left squarebrace
+        if (toPlot[parseIt] != '(') {
+                std::cerr << "error: there is no left brace" << std::endl;
+                return ;
+        }
+        begin = ++parseIt;
+        ++braceNum;
+        while (toPlot.find("^") != std::string::npos) {
+                //'^' character position
+                int i = toPlot.find("^");
+                toPlot.replace(i, 1, "**");
+        }
+        //Check is there right squarebrace, and there is none
+        //return error
+        for ( ; parseIt < toPlot.size(); ++parseIt) {
+                if (toPlot[parseIt] == '(') ++braceNum;
+                if (toPlot[parseIt] == ')') --braceNum;
+                if (!braceNum) break ;
+        }
+        if (braceNum) {
+                std::cerr << "error: there is no right square brace for plot function"
+                        << std::endl;
+                return ;
+        }
+        end = parseIt;
+        /*Check if there is no obscure character
+        after the right squarebrace, and if there
+        is, return error*/
+        while (std::isspace(toPlot[++parseIt])) ;
+        if (parseIt != toPlot.size()) {
+                std::cerr << "error: there is some obscure chararcter after right squarebrace"
+                        << std::endl;
+                return ;
+        }
+		//Expression string
+		toPlot = toPlot.substr(begin, end - begin);
+		//Set plot function
+		std::string funcName = "plot";
+		funcs["plot"].equation = toPlot;
+		funcs["plot"].token = "x";
+		isFunc = true;
+		//Preview of equation before plotting
+		if (!InitEquationParse(toPlot, error, funcName, "")) {
+			history.push_back(error);
+			std::cerr << history.back() << std::endl;
+			return;
+		}
+		//If everything is allright, let's calculate expression
+		//In case of error, return it
+		pol.setToken(funcs["plot"].token);
+		pol.setInfixExpr(std::move(toPlot));
+		if (!pol.getErrMsg().empty()) {
+			history.push_back(pol.getErrMsg());
+			std::cerr << history.back() << std::endl;
+			return ;
+		}
+		toPlot = pol.CalcIt();
+		if (!pol.getErrMsg().empty()) {
+			history.push_back(pol.getErrMsg());
+			std::cerr << history.back() << std::endl;
+			return ;
+		}
+		//After parsing and calculating expression
+		//we should delete temporary 'plot' function
+		funcs.erase("plot");
+        //plot fixed string
+        gp << "plot " << toPlot.substr(begin, end - begin) << std::endl;
 }

@@ -136,6 +136,25 @@ int main(void) {
 	//Output of all variables
 	std::cout << std::endl << "Output of all declared variables:" << std::endl;
 	proc.VariablesOutput();
+
+	 while (true) {
+     	//Input string. To exit function type 'quit' or 'exit'
+     	std::string input;
+     	//input index iterator
+     	int i = 0;
+
+     	std::cout << "> ";
+     	std::getline(std::cin, input);
+     	if (input.empty()) continue ;
+     	if (input == "quit" || input == "exit") break ;
+     	while (std::isspace(input[i])) ++i;
+     	if (!input.compare(i, std::strlen("history"), "history"))
+     		HistoryOutput(input);
+        else if (!input.compare(i, std::strlen("variables"), "variables"))
+        	VariablesOutput(input);
+		else if (!input.compare(i, 4, "plot")) PlotFunction(input);
+	 }
+
 	return 0;
 }
 

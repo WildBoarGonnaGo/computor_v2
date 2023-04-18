@@ -48,6 +48,9 @@ class EquationProc {
 	//position in source string
 	int RetError(std::string &error, const std::string &errMsg,
 				 const int &i, const std::string &src);
+	//In case of expression error, push it to history, output to error stream
+	// and return, else just return 1
+	int RetExprError(const std::string &error);
 public:
 	EquationProc();
 	//EquationProc(std::string &&equation);
@@ -57,6 +60,8 @@ public:
 	void HistoryOutput();
 	//Output list of all available variables
 	void VariablesOutput();
+	//Plotting function
+	void PlotFunction(const std::string &src);
 };
 
 #endif
