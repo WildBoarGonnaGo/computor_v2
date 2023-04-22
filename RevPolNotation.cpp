@@ -2,8 +2,10 @@
 #include <set>
 #include <cmath>
 #include <vector>
-#include <iostream>
 #include <stack>
+#include <sstream>
+#include <iomanip>
+#include <functional>
 
 //Get double number from string
 std::string			RevPolNotation::GetStringNumber(const std::string &str, int &i) {
@@ -45,11 +47,10 @@ std::list<std::string> RevPolNotation::DenomElems(const std::string &src) {
 	std::list<std::string> res;
 	std::string elem;
 	int ghost = 0;
-	//std::set<std::string> funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs" };
 
 	for (int i = 0; i < src.length(); ++i) {
 		elem.push_back(src[i]);
-		if (/*auto search = funcs.find(elem); search != funcs.end() || */src[i] == '(') ++ghost;
+		if (src[i] == '(') ++ghost;
 		else if (src[i] == ')') --ghost;
 		else if ((src[i] == '+' || (src[i] == '-' && std::isspace(src[i + 1]))) && !ghost) {
 			int tmp = elem.size() - 1;
@@ -125,10 +126,14 @@ void RevPolNotation::ComplexMultiDivNum(std::list<std::string> &elems, const std
 			std::list<std::string> tmpList;
 			std::string strPart;
 
-			strNum = (*it).substr(0, (*it).find_first_not_of("-0123456789."));
-			strAlpha = (*it).substr((*it).find_first_not_of("-0123456789. *"));
+			if ((*it).find_first_not_of("-0123456789.") != std::string::npos)
+				strNum = (*it).substr(0, (*it).find_first_not_of("-0123456789."));
+			else strNum = *it;
+			if ((*it).find_first_not_of("-0123456789. *") != std::string::npos)
+				strAlpha = (*it).substr((*it).find_first_not_of("-0123456789. *"));
 			strNum = simplePrefixNum(strNum);
-			strNum = prefixNum(RemoveTrailZeros(Execute(oper, strNum, num)), " * ");
+			strNum = prefixNum(RemoveTrailZeros(Execute(oper, strNum, num)),
+							   ((!strAlpha.empty()) ? " * " : ""));
 			*it = strNum + strAlpha;
 		}
 	}
@@ -561,6 +566,10 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 		errmsg = "error division by zero is undefined";
 		return "";
 	};
+	//string stream for output
+	std::stringstream oss;
+	//complex number postfix
+	std::string postCom;
 
 	ifAlphaFirst = std::find_if(f.begin(), f.end(), ifAlpha) != f.end();
 	ifAlphaSecond = std::find_if(s.begin(), s.end(), ifAlpha) != s.end();
@@ -581,38 +590,76 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 		if (!sNum) return divError(calcError, errmsg);
 		res = fNum / sNum;
 	}
-	else if (!oper.compare("^")) res = std::pow(fNum, sNum);
+	else if (!oper.compare("^")) {
+		//If fNum is a negative number and
+		//pow is a form of a square root
+		//we deal with complex number
+		if (fNum < 0 && !std::fmod((1 / sNum ), 2)) {
+			//generate postfix part for
+			//complex number
+			fNum *= -1;
+			postCom = " * i";
+		}
+
+		res = std::pow(fNum, sNum);
+	}
 	else if (!oper.compare("%")) {
 		if (!sNum) return divError(calcError, errmsg);
 		res = std::fmod(fNum, sNum);
 	}
-	return std::to_string(res);
+	oss << std::setprecision(10) << res;
+	return oss.str() + postCom;
 }
 
 //Private method. It returns exposed func string, if func's
 //operand contains alphabetical character
 std::string RevPolNotation::UDfuncExpose(const Func &src, const std::string &forReplace) {
-	std::string res = src.equation;
+	//Equation itself
+	std::string res = src.equation, replace = forReplace;
+	//Number of elements in equation
+	int num;
+	//Expression calculator
+	RevPolNotation pol(userDefFuncs);
 
+	//Calculate number of elemens in equation
+	num = DenomElems(forReplace).size();
+	//if number of elements is greater than 1, add brace
+	//to the begining and the end of 'forReplace' string
+	if (num > 1) {
+		replace.insert(0, 1, '(');
+		replace.push_back(')');
+	}
 	if (forReplace == src.token) return res;
+	//search iterator
+	size_t s = 0;
 	while(true) {
-		if (auto s = res.find(src.token); s != std::string::npos) {
-			res.replace(s, src.token.size(), forReplace);
+		if (s = res.find(src.token, s); s != std::string::npos) {
+			res.replace(s, src.token.size(), replace);
+			s += replace.size();
 			continue ;
 		}
 		break ;
 	}
-	return res;
+	//Let's calculate 'res' string
+	pol.setToken(token);
+	pol.setInfixExpr(std::move(res));
+	return pol.CalcIt();
 }
 
+//Private method. It executes base and user defined functions
 std::string RevPolNotation::funcExecute(const std::string &oper, const std::string &var) {
 	double res = 0;
 	bool hasAlpha;
 	auto ifAlpha = [](const char &c) { return std::isalpha(c); };
 	auto search = userDefFuncs.find(oper);
+	//string stream for output
+	std::stringstream oss;
+	//Postfix for complex number
+	std::string postCom;
 
 	hasAlpha = std::find_if(var.begin(), var.end(), ifAlpha) != var.end();
-	if (hasAlpha && search == userDefFuncs.end()) return oper + "(" + var + ")";
+	if (hasAlpha && search == userDefFuncs.end())
+		return oper + "(" + ElemsSort(var) + ")";
 	else if (hasAlpha && search != userDefFuncs.end()) return UDfuncExpose(search->second, var);
 
 	if (search != userDefFuncs.end()) {
@@ -633,11 +680,35 @@ std::string RevPolNotation::funcExecute(const std::string &oper, const std::stri
 		res = std::tan(std::stod(var));
 	}
 	else if (!oper.compare("exp")) res = std::exp(std::stold(var));
-	else if (!oper.compare("sqrt")) res = std::sqrt(std::stold(var));
+	else if (!oper.compare("sqrt")) {
+		res = std::stold(var);
+
+		//If number is negative, we deal with complex number
+		//and generate complex number postfix for result
+		if (res < 0) {
+			res *= -1;
+			postCom = " * i";
+		}
+		res = std::sqrt(std::stold(var));
+	}
+
 	else if (!oper.compare("abs")) res = std::abs(std::stold(var));
 	else if (oper == "rad") res = ToRadians(std::stold(var));
+	else if (oper == "acos") res = std::acos(std::stold(var));
+	else if (oper == "asin") res = std::asin(std::stold(var));
+	else if (oper == "atan") res = std::atan(std::stold(var));
+	else if (oper == "ceil") res = std::ceil(std::stold(var));
+	else if (oper == "floor") res = std::floor(std::stold(var));
+	else if (oper == "cosh") res = std::asin(std::stold(var));
+	else if (oper == "log") res = std::log(std::stold(var));
+	else if (oper == "logt") res = std::log10(std::stold(var));
+	else if (oper == "tanh") res = std::tanh(std::stold(var));
+	else if (oper == "deg") res = ToDegrees(std::stold(var));
+	else if (oper == "sinh") res = std::sinh(std::stold(var));
 
-	return std::to_string(res);
+	//return std::to_string(res);
+	oss << std::setprecision(10) << res;
+	return oss.str() + postCom;
 }
 
 std::string		RevPolNotation::ProcessPostfix() {
@@ -859,6 +930,49 @@ long double RevPolNotation::ToRadians(const long double &val) {
 	return val * M_PI / 180;
 }
 
+//Convert radians to degrees
+long double RevPolNotation::ToDegrees(const long double &val) {
+	return val * M_PI / 180;
+}
+
+//Sorting function conatins
+std::string RevPolNotation::ElemsSort(const std::string &src) {
+	//Init elems for sort
+	std::list<std::string> toSort = DenomElems(src);
+	//Result string
+	std::string res;
+
+	//Reduce number of elements, so there will be only elements
+	for (auto it = toSort.begin(); it != toSort.end(); ++it) {
+		//If there is '+' or '-' multiply 1 or -1 correspondigly and next element,
+		//then erase '+' or '-' element
+		if (*it == "+" || *it == "-") {
+			//'1' or '-1' multiplier
+			std::string one = (*it == "+") ? "1" : "-1";
+			it = toSort.erase(it);
+			*it = RemoveTrailZeros(Execute("*", "1", *it));
+		}
+	}
+	//Sort elements in ascension order
+	toSort.sort(std::greater<std::string>());
+	//Generate result string
+	for (auto it = toSort.begin(); it != toSort.end(); ++it) {
+		if (it == toSort.begin()) res.append(*it);
+		else {
+			//In case when first character is '-', remove it
+			//and add subtraction in string with element
+			if (it->at(0) == '-') {
+				it->erase(0, 1);
+				res.append(" - " + *it);
+			}
+			//Else add summation in string with element
+			else
+				res.append(" + " + *it);
+		}
+	}
+	return res;
+}
+
 RevPolNotation::RevPolNotation(std::map<std::string, Func> &userDefFuncsRef) : baseOpers("+-/*^%~"), userDefFuncs(userDefFuncsRef) {
 	operPriority["("] = 0;
 	operPriority["+"] = 1;
@@ -869,7 +983,9 @@ RevPolNotation::RevPolNotation(std::map<std::string, Func> &userDefFuncsRef) : b
 	operPriority["^"] = 3;
 	operPriority["~"] = 5;
 
-	funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
+	funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
+			  "acos", "asin", "atan", "ceil", "floor", "cosh",
+			  "log", "logt", "tanh", "deg", "sinh" };
 	for (std::string var : funcs)
 		operPriority[var] = 4;
 }
@@ -887,7 +1003,9 @@ RevPolNotation::RevPolNotation(std::string &&init_expr, std::map<std::string, Fu
 	operPriority["~"] = 5;
 
 	inifixExpr = std::move(init_expr);
-	funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
+	funcs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
+			  "acos", "asin", "atan", "ceil", "floor", "cosh",
+			  "log", "logt", "tanh", "deg", "sinh" };
 	for (std::string var : funcs)
 		operPriority[var] = 4;
 	if (!token.empty())

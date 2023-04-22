@@ -5,6 +5,9 @@
 #include "MatrixCalc.h"
 #include <cmath>
 #include <cstring>
+#include <limits>
+#include <sstream>
+#include <iomanip>
 
 //Get double number from string
 std::string	MatrixCalc::GetStringNumber(const std::string &str, int &i) {
@@ -78,6 +81,10 @@ void MatrixCalc::ProcessPostfix() {
 	//Data queue control
 	bool					number = false;
 
+	//Seek 'lpnorm' function in infix notation expression
+	//and if there is error,
+	LPnorm();
+	if (!error.empty()) return ;
 	//Parsing string
 	for (int i = 0; i < infixEq.size(); ++i) {
 		//If character is digit
@@ -334,8 +341,10 @@ MatrixCalc::MatrixCalc(std::map<std::string, Func> &funcsSrc,
 	operPriority["~"] = 5;
 
 	//Set of base functions
-	baseFuncsReg = { "sin", "cos", "tan", "exp", "sqrt", "abs" } ;
-	baseFuncsMatrix = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
+	baseFuncsReg = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
+					 "acos", "asin", "atan", "ceil", "floor", "cosh",
+					 "log", "logt", "tanh", "deg", "sinh" } ;
+	baseFuncsMatrix = { "inv", "transp", "lonenorm", "ltwonorm", "linfnorm", "det", "adj" };
 	//Set priority for base functions
 	for (std::string var : baseFuncsReg)
 		operPriority[var] = 4;
@@ -460,39 +469,20 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			error = "error: " + oper + ": " + var.eq + "isn't a matrix";
 			res.state = 4; return res;
 		}
-		//{ "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
+		//{ "inv", "transp", "lonenorm", "ltwonorm", "linfnorm", "det", "adj" };
 		if (*matrixSearch == "lonenorm") res = L1norm(var.matrix);
 		else if (*matrixSearch == "ltwonorm") res = L2norm(var.matrix);
 		else if (*matrixSearch == "transp") res = Transpose(var.matrix);
 		else if (*matrixSearch == "det") res = Det(var.matrix);
 		else if (*matrixSearch == "adj") res = Adj(var.matrix);
 		else if (*matrixSearch == "inv") res = Inv(var.matrix);
-	}
-	//In case of user defined function, that processes matricies
-	else if (search != funcs.end() && search->second.tokenIsMatrix == 1) {
-		//Check is variable a matrix, if it's not return error
-		if (var.state != 1) {
-			error = "error: " + oper + ": " + var.eq + "isn't a matrix";
-			res.state = 4; return res;
-		}
-		//Expression to calculate Matrix
-		std::string expr;
-		//Replace matrix function
-		expr = ((!var.eq.empty())) ? funcExpose(search->second, var.eq)
-				: funcExpose(search->second, var.matrix.getMatrix());
-		//Matrix expression calculator
-		MatrixCalc subCalc(funcs, matricies, expr, token);
-		if (!subCalc.getError().empty()) {
-			error = subCalc.getError();
-			res.state = 4; return res;
-		}
-		res = subCalc.getFinValue();
+		else if (*matrixSearch == "linfnorm") res = LInfNorm(var.matrix);
 	}
 	//In other cases calculate it as a regular expression
-	else if (search != funcs.end() && search->second.tokenIsMatrix == 2) {
+	else if (search != funcs.end() || funcSearch != baseFuncsReg.end()) {
 		//Check is variable a regular expression, if it's not return error
 		if (var.state != 2) {
-			error = "error: " + oper + ": " + var.matrix.getMatrix() + "isn't a matrix";
+			error = "error: " + oper + ": " + var.matrix.getMatrix() + "isn't a regular expression";
 			res.state = 4; return res;
 		}
 		//Regular expression calculator
@@ -542,12 +532,6 @@ void MatrixCalc::LPnorm() {
 		}
 		//position of end of 'lpnorm' function
 		int end = pos;
-		//If there is no comma character, return error
-		if (infixEq.find(',', begin) == std::string::npos) {
-			error = MarkError(infixEq, begin) + "\nerror: wrong number of braces";
-			return ;
-		}
-		pos = infixEq.find(',', begin);
 		//Matrix for calculation
 		Matrix m;
 		//Matrix index parser
@@ -568,7 +552,37 @@ void MatrixCalc::LPnorm() {
 			}
 		}
 		//If it's not a variable, let's parse first attribute of 'lpnorm' function
-		else m.setMatrix(infixEq.substr(begin, pos++ - begin - 1), funcs, matricies);
+		else {
+			//If there is no squarebrace in 'mi' position return error
+			if (infixEq[mi] != '[') {
+				error = MarkError(infixEq, mi) + "error: matricies: there is no such variable";
+				return ;
+			}
+			//number of squarebraces.
+			brace = 0;
+			//Parse piece of matrix string in 'lpnorm' function
+			//If number of squarebraces doesn't fit, return error
+			for ( ; mi < infixEq.size(); ++mi) {
+				if (infixEq[mi] == '[') ++brace;
+				else if (infixEq[mi] == ']') --brace;
+				if (!brace) break;
+			}
+			if (brace) {
+				error = MarkError(infixEq, mi) + "\nerror: wrong number of braces";
+				return ;
+			}
+			m.setMatrix(infixEq.substr(begin, mi + 1 - begin), funcs, matricies);
+			++mi;
+		}
+		//Passing whitespaces and check if there is comma character
+		//and if there is no, return error
+		while (std::isspace(infixEq[mi])) ++mi;
+		if (infixEq[mi] != ',') {
+			error = MarkError(infixEq, mi) + "error: matricies: there should be comma character";
+			return ;
+		}
+		pos = ++mi;
+		//Check matrix for error. If there is, return it
 		if (!m.getError().empty()) { error = m.getError(); return ; }
 		//If matrix isn't a vector (it's row or column should only one)
 		//return error
@@ -578,18 +592,72 @@ void MatrixCalc::LPnorm() {
 		}
 		//Let's calculate power value, in case of error
 		//return it
-		matVar = infixEq.substr(pos, end - pos - 1);
+		matVar = infixEq.substr(pos, end - pos);
 		pol.setInfixExpr(std::move(matVar));
 		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return ; }
 		matVar = pol.CalcIt();
 		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return ; }
-
+		//set of matrix values
+		std::vector<std::string> values = m.getValues();
+		//final expression string for calculating
+		std::string expr = "(";
+		for (int i = 0; i < values.size(); ++i) {
+			expr += "abs(" + values[i] + ")^"
+					+ matVar + ((i != values.size() - 1) ? " + " : ")^(1 / " + matVar + ")");
+		}
+		//Calculate expression. In case of error return it
+		pol.setInfixExpr(std::move(expr));
+		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return ; }
+		expr = pol.CalcIt();
+		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return ; }
+		//Replace 'lpnorm' function with new calculated value in expression
+		infixEq.replace(infixEq.find("lpnorm"), end - infixEq.find("lpnorm") + 1, expr);
 	}
 }
 
 //Return infinite norm
 MatrixCalc::value MatrixCalc::LInfNorm(const Matrix &matrix) {
+	//Result value
+	value res;
+	//Expression calculator
+	RevPolNotation pol(funcs);
+	//Set of source matrix values
+	std::vector<std::string> values = matrix.getValues();
+	//Max value. When initiated, it's value is the most
+	//minimum possible value
+	long double max = std::numeric_limits<long double>::min();
+	//string stream, to format value. Set precision to 10
+	std::stringstream oss;
 
+	//If matrix isn't a vector (it's row or column should only one)
+	//return error
+	if (matrix.getRow() != 1 && matrix.getColumn() != 1) {
+		error = "error: linfnorm: " + matrix.getMatrix() + ": this matrix isn't vector";
+		res.state = 4; return res;
+	}
+	for (std::string var : values) {
+		//expression entity
+		std::string expr = "abs(" + var + ")";
+		//temporary double value
+		long double tmp;
+
+		//Calculate expression. In case of error return it
+		pol.setInfixExpr(std::move(expr));
+		if (!pol.getErrMsg().empty()) {
+			error = pol.getErrMsg(); res.state = 4 ; return res;
+		}
+		expr = pol.CalcIt();
+		if (!pol.getErrMsg().empty()) {
+			error = pol.getErrMsg(); res.state = 4; return res;
+		}
+		tmp = std::stold(expr);
+		if (max < tmp) max = tmp;
+	}
+	//Generate result value
+	oss << std::setprecision(10) << max;
+	res.state = 2;
+	res.eq = oss.str();
+	return res;
 }
 
 //Return lonenorm value result
@@ -905,20 +973,6 @@ MatrixCalc::value MatrixCalc::Inv(const Matrix &src) {
 	return res;
 }
 
-//Expose function and replace token
-std::string MatrixCalc::funcExpose(const Func &src, const std::string &forReplace) {
-	std::string res = src.equation;
-
-	while(true) {
-		if (auto s = res.find(src.token); s != std::string::npos) {
-			res.replace(s, src.token.size(), forReplace);
-			continue ;
-		}
-		break ;
-	}
-	return res;
-}
-
 //Execute function block, no matter it's for matricies, regular expression
 //or it's some user defined
 MatrixCalc::value MatrixCalc::funcExprExec(const std::string &oper, std::stack<value> &nums) {
@@ -954,14 +1008,14 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		else if (oper == "*") res = MatrixMulti(first.matrix, second.matrix);
 		//In case of division operation return error
 		else if (oper == "/") {
-			error = "error: '/': " + first.matrix.getMatrix() + ": "
-			+ second.matrix.getMatrix() + ": matricies division is not permitted";
+			error = "error: '/': " + FinResGenerate(first, true) + ": "
+			+ FinResGenerate(second, true) + ": matricies division is not permitted";
 			res.state = 4;
 		}
 		//In case of power raising return error
 		else if (oper == "^") {
-			error = "error: '/': " + first.matrix.getMatrix() + ": "
-				+ second.matrix.getMatrix() + ": matricies power raise is not permitted";
+			error = "error: '/': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": matricies power raise is not permitted";
 			res.state = 4;
 		}
 	}
@@ -971,14 +1025,14 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		if (oper == "*") res = MatrixNumMulti(second, first);
 		//In case of summation return error
 		else if (oper == "+") {
-			error = "error: '+': " + first.matrix.getMatrix() + ": "
-				+ first.eq + ": summation of matrix and regular expression is not permitted";
+			error = "error: '+': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": summation of matrix and regular expression is not permitted";
 			res.state = 4;
 		}
 		//In case of subtraction return error
 		else if (oper == "-") {
-			error = "error: '-': " + first.matrix.getMatrix() + ": "
-				+ second.eq + ": subtraction of matrix and regular expression is not permitted";
+			error = "error: '-': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": subtraction of matrix and regular expression is not permitted";
 			res.state = 4;
 		}
 		//In case of division
@@ -990,37 +1044,40 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		//In case of power raising
 		else if (oper == "^") res = MatrixPowerRaise(first, second);
 	}
-	//In case of first variable is a regular expression and second is a matrix
-	else if (first.state == 2 && second.state == 1) {
+	//In case of first variable is a regular expression (or token) and second is a matrix
+	else if ((first.state == 2 || first.state == 3) && second.state == 1) {
 		//In case of multiplication
 		if (oper == "*") res = MatrixNumMulti(first, second);
 		//In case of summation return error
 		else if (oper == "+") {
-			error = "error: '+': " + first.eq + ": "
-				+ second.matrix.getMatrix() + ": summation of regular expression and matrix is not permitted";
+			error = "error: '+': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": summation of regular expression and matrix is not permitted";
 			res.state = 4;
 		}
 		//In case of subtraction return error
 		else if (oper == "-") {
-			error = "error: '-': " + first.eq + ": "
-				+ second.matrix.getMatrix() + ": subtraction of regular expression and matrix is not permitted";
+			error = "error: '-': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": subtraction of regular expression and matrix is not permitted";
 			res.state = 4;
 		}
 		//In case of division return error
 		else if (oper == "/") {
-			error = "error: '/': " + first.eq + ": "
-				+ second.matrix.getMatrix() + ": division of regular expression and matrix is not permitted";
+			error = "error: '/': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": division of regular expression and matrix is not permitted";
 			res.state = 4;
 		}
 		//In case of power raise return error
 		else if (oper == "^") {
-			error = "error: '^': " + first.eq + ": "
-				+ second.matrix.getMatrix() + ": regular expression raising to a matrix is not permitted";
+			error = "error: '^': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": regular expression raising to a matrix is not permitted";
 			res.state = 4;
 		}
 	}
-	//In case of both values are regular expressions
-	if (first.state == 2 && second.state == 2) {
+	//In case of both values are regular expressions, or
+	//one these values is token, and second is regular expression
+	else if ((first.state == 2 && second.state == 2)
+		|| (first.state == 3 && second.state == 2)
+		|| (first.state == 2 && second.state == 3)) {
 		//Expression calculator, in case of error return it
 		RevPolNotation pol(funcs);
 		pol.setInfixExpr("(" + first.eq + ") " + oper + " (" + second.eq + ")");
@@ -1029,6 +1086,26 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); res.state = 4; }
 		res.state = 2;
 	}
+	//If first variable is matrix and second is token
+	else if (first.state == 1 && second.state == 3) {
+		if (oper == "*" || oper == "-" || oper == "+" || oper == "^") {
+			//operation value
+			value operVal;
+			operVal.state = 0;
+			operVal.eq = oper;
+
+			res.vec.push_back(first);
+			res.vec.push_back(operVal);
+			res.vec.push_back(second);
+		}
+		if (oper == "/") {
+			//Temporary value for further calculations
+			value tmp; tmp.eq = "1 / (" + second.eq + ")";
+			res = MatrixNumMulti(tmp, first);
+		}
+		res.state = 1;
+	}
+	//If first variable is token and second is matrix
 	return res;
 }
 
@@ -1216,6 +1293,88 @@ MatrixCalc::value MatrixCalc::MatrixPowerRaise(const value &f, const value &s) {
 	for (int i = 1; i < bound; ++i) {
 		res = MatrixMulti(res.matrix, f.matrix);
 		if (res.state == 4) return res;
+	}
+	return res;
+}
+
+//Denomination elements for regular expression
+std::list<std::string> MatrixCalc::DenomElems(const std::string &src) {
+	std::list<std::string> res;
+	std::string elem;
+	int ghost = 0;
+
+	for (int i = 0; i < src.length(); ++i) {
+		elem.push_back(src[i]);
+		if (src[i] == '(') ++ghost;
+		else if (src[i] == ')') --ghost;
+		else if ((src[i] == '+' || (src[i] == '-' && std::isspace(src[i + 1]))) && !ghost) {
+			int tmp = elem.size() - 1;
+
+			elem = elem.substr(0, tmp);
+			elem = elem.substr(0, elem.find_last_not_of(" ") + 1);
+			elem = elem.substr(elem.find_first_not_of(" "));
+			res.push_back(elem);
+			elem.clear();
+			elem.push_back(src[i]);
+			res.push_back(elem);
+			elem.clear();
+		}
+	}
+	if (!elem.empty()) {
+		elem = elem.substr(0, elem.find_last_not_of(" ") + 1);
+		elem = elem.substr(elem.find_first_not_of(" "));
+		res.push_back(elem);
+	}
+	return res;
+}
+
+//Generating string in case of error, or in case of result
+std::string MatrixCalc::FinResGenerate(const value &val, const bool &isError) {
+	//If source value's list is empty return it corresponding string
+	if (val.vec.empty()) {
+		//In case of regular expression or token
+		if (val.state == 2 || val.state == 3) return val.eq;
+		//In case of matrix and calculating error
+		if (val.state == 1 && isError) return val.matrix.getMatrix();
+		//And finally, if it's ok, just return matrix
+		else return val.matrix.toString();
+	}
+	//Result string
+	std::string res;
+	//In other case generate result with
+	//vector parsing, result string
+	for (int i = 0; i < val.vec.size(); ++i) {
+		//In case of first element just append it to string
+		if (!i) {
+			//In case of matrix
+			if (val.vec[i].state == 1) res.append(val.vec[i].matrix.getMatrix());
+			//In case of regular expression
+			else if (val.vec[i].state == 2) res.append(val.vec[i].eq);
+			//In case of operator (function)
+			else if (!val.vec[i].state) res.append(val.vec[i].eq);
+			//In case of brace
+			else if (val.vec[i].state == 5) res.append(val.vec[i].eq);
+		}
+		//In other cases parse looking forward operations
+		//In case of some function or base operator
+		if (!val.vec[i].state) {
+			//Search among base regular functions
+			auto s = baseFuncsReg.find(val.vec[i].eq);
+			//Search among base matrix functions
+			auto sm = baseFuncsMatrix.find(val.vec[i].eq);
+
+			//If function was found append function name and brace
+			//after it
+			if (s != baseFuncsReg.end() || sm != baseFuncsMatrix.end()) {
+				res.append(val.vec[i++].eq); res.append(val.vec[i].eq);
+			}
+			//In other cases just append operation with spaces
+			else res.append(" " + val.vec[i].eq + " ");
+		}
+		//In case of matrix
+		else if (!val.vec[i].state == 1) res.append(val.vec[i].matrix.getMatrix());
+		//in other cases just append vector element
+		else res.append(val.vec[i].eq);
 	}
 	return res;
 }

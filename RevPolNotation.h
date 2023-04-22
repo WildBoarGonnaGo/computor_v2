@@ -95,6 +95,10 @@ class RevPolNotation {
 	std::string RemoveTrailZeros(const std::string &str);
 	//Converting degrees to radians
 	long double ToRadians(const long double &val);
+	//Convert radians to degrees
+	long double ToDegrees(const long double &val);
+	//Sorting function conatins
+	std::string ElemsSort(const std::string &src);
 public:
 	RevPolNotation() = delete;
 	RevPolNotation(std::map<std::string, Func> &userDefFuncsRef);

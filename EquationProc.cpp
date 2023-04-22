@@ -4,7 +4,7 @@
 #include <iostream>
 
 EquationProc::EquationProc() {
-	gp << "set term wxt title \"lchantel - computorv2\"" << std::endl;
+	gp << "set term qt title 'lchantel - computorv2'" << std::endl;
 }
 
 //Add equation: either function or variable, or some equation.
@@ -21,7 +21,9 @@ void EquationProc::AddEquation(std::string &&equation) {
 	//Lambda function. it returns position if there is some base function
 	//else it returns -1
 	auto ifBaseFuncIn = [](const std::string &src, std::string &error) {
-		std::set<std::string> baseFuncs = {"sin", "cos", "tan", "exp", "sqrt", "abs", "rad"};
+		std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
+										   "acos", "asin", "atan", "ceil", "floor", "cosh",
+										   "log", "logt", "tanh", "deg", "sinh" };
 		for (std::set<std::string>::iterator it = baseFuncs.begin(); it != baseFuncs.end(); ++it) {
 			int search = src.find(*it);
 			if (search != std::string::npos) {
@@ -33,6 +35,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 	};
 
 	history.push_back(std::move(equation));
+	//sample = history.back();
 	if (equation.find('>') == std::string::npos)
 		history.back().insert(0, ">> ");
 	sample = history.back().substr(history.back().find_first_not_of("	> "));
@@ -52,6 +55,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 	//If we deal with simple computational part
 	if (questMark == 1) {
 		equalSignPos = sample.find('=') - 1;
+
 		while (std::isspace(sample[equalSignPos])) --equalSignPos;
 		sample = sample.substr(0, equalSignPos + 1);
 		//If we deal with matricies calculate is as matrix
@@ -66,6 +70,9 @@ void EquationProc::AddEquation(std::string &&equation) {
 			}
 			return ;
 		}
+		//Set token for parser
+		parser.setToken(curToken);
+		//Calculate expression. In case of error return it
 		parser.setInfixExpr(std::move(sample));
 		if (!(RetExprError(parser.getErrMsg()))) return ;
 		history.push_back(parser.CalcIt());
@@ -91,9 +98,10 @@ void EquationProc::AddEquation(std::string &&equation) {
 		delim = rightEq.size();
 		while (rightEq[delim - 1] == '?' || std::isspace(rightEq[delim - 1])) --delim;
 		rightEq.resize(delim);
+		//Set token for parser
+		parser.setToken(curToken);
 		//Parse left and right equations and in case of error
 		//return it
-		parser.setToken(curToken);
 		parser.setInfixExpr(std::move(leftEq));
 		if (!(RetExprError(parser.getErrMsg()))) return ;
 		leftEq = parser.CalcIt();
@@ -102,8 +110,9 @@ void EquationProc::AddEquation(std::string &&equation) {
 		if (!(RetExprError(parser.getErrMsg()))) return ;
 		rightEq = parser.CalcIt();
 		if (!(RetExprError(parser.getErrMsg()))) return ;
-		leftEq.append(" = ");
+		leftEq.append(" - (");
 		leftEq.append(rightEq);
+		leftEq.push_back(')');
 		//Check if equation has some base function
 		if ((delim = ifBaseFuncIn(leftEq, errMsg)) != -1) {
 			RetError(errMsg, std::string(errMsg), delim, leftEq);
@@ -111,6 +120,10 @@ void EquationProc::AddEquation(std::string &&equation) {
 			std::cerr << history.back() << std::endl;
 			return;
 		}
+		//Let's calculate final equation
+		parser.setInfixExpr(std::move(leftEq));
+		leftEq = parser.CalcIt();
+		leftEq.append(" = 0");
 		//let's solve equation
  		computor solve(leftEq, curToken);
 		history.push_back(solve.to_string());
@@ -126,6 +139,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 	//if error occured
 	if (!state) {
 		history.push_back(errMsg);
+		std::cerr << errMsg << std::endl;
 		return ;
 	}
 	isFunc = (state == 2) ? true : false;
@@ -133,15 +147,18 @@ void EquationProc::AddEquation(std::string &&equation) {
 	if (!InitEquationParse(sample, errMsg, entityName, oldValue)) {
 		history.push_back(errMsg);
 		std::cerr << history.back() << std::endl;
+		//Remove function or variable from database
+		if (isFunc) funcs.erase(entityName);
+		else vars.erase(entityName);
 		return ;
 	}
 	//Variable case calculation
 	else if (state == 1) {
 		//Calculate expression, in case of error return it
 		parser.setInfixExpr(std::move(sample));
-		if (!(RetExprError(parser.getErrMsg()))) return ;
+		if (!(RetExprError(parser.getErrMsg()))) { vars.erase(entityName); return ; }
 		vars[entityName] = parser.CalcIt();
-		if (!(RetExprError(parser.getErrMsg()))) return ;
+		if (!(RetExprError(parser.getErrMsg()))) { vars.erase(entityName); return ; }
 		history.push_back(vars[entityName]);
 		std::cout << history.back() << std::endl;
 	}
@@ -149,9 +166,9 @@ void EquationProc::AddEquation(std::string &&equation) {
 	else if (state == 2) {
 		parser.setToken(funcs[entityName].token);
 		parser.setInfixExpr(std::move(sample));
-		if (!(RetExprError(parser.getErrMsg()))) return ;
+		if (!(RetExprError(parser.getErrMsg()))) { funcs.erase(entityName); return ; }
 		funcs[entityName].equation = parser.CalcIt();
-		if (!(RetExprError(parser.getErrMsg()))) return ;
+		if (!(RetExprError(parser.getErrMsg()))) { funcs.erase(entityName); return ; }
 		history.push_back(funcs[entityName].equation);
 		std::cout << history.back() << std::endl;
 	}
@@ -204,7 +221,8 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 	//Equation string
 	std::string eq;
 	//Set of base matrix functions
-	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "linfnorm",
+											  "lpnorm", "det", "adj" };
 	//Seeking name of variables (function) and name of token
 	//passing whitespaces
 	auto indx = [](const std::string &src, std::string &dst, int i) {
@@ -213,23 +231,50 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 			if (!std::isalpha(src[i])) break ;
 			dst.push_back(src[i]);
 		}
-		while (std::isspace(src[i])) ++i;
 		return i;
 	};
 
 	i = indx(src, res, i);
+	//If digit occured return erro
 	//Using 'plot' name is not permitted, it's already
 	//taken for plotting function
 	if (res == "plot") {
 		return RetError(error, "\nerror: 'plot' name for function or variable is not permitted",
-						i, src);
+						0, src);
 	}
+	//if name is equal to 'i' return error
+	if (res == "i")
+		return RetError(error, "\nerror: function or variables name can't be 'i', it's complex number",
+						0, src);
+	if (res == "pi")
+		return RetError(error, "\nerror: function or variables name can't be 'pi', it's math constant",
+						0, src);
+	while (std::isspace(src[i])) ++i;
+	//If name of variable or function is empty, return error
+	if (res.empty() && src[i] == '=')
+		return RetError(error, "\nerror: no name for function or variable is defined",
+						0, src);
+	//If some obscure character found return error
+	if (src[i] != '(' && src[i] != '=')
+		return RetError(error, "\nerror: function or variable name must consist of alphabetical characters only",
+						i, src);
 	if (src[i] == '(') {
+		//Let's fix brace position
+		int brace = 0;
 		isfunc = 1;
+		//if number of braces doesn't fit, return error
+		for (int j = i; j < src.size(); ++j) {
+			if (src[j] == '(') ++brace;
+			else if (src[j] == ')') --brace;
+			if (!brace) break;
+		}
+		if (brace)
+			return RetError(error, "\nerror: there is no right brace for function token",
+							i, src);
 		funcs[res] = func;//func.name = std::move(res);
 		//func = src.substr(0,  i++);
 		i = indx(src, funcs[res].token, i + 1);
-		if (src[i++] != ')') {
+		if (src[i] != ')') {
 			funcs.erase(res);
 			return RetError(error, "\nerror: function token must consist of only alphabetical characters",
 							i, src);
@@ -238,6 +283,7 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 			funcs.erase(res);
 			return RetError(error, "\nerror: token can't be empty", i - 1, src);
 		}
+		++i;
 	}
 	i = src.find_first_not_of( " 	", i);
 	if (src[i] != '=') {
@@ -328,7 +374,9 @@ int EquationProc::EqualSignsNum(const std::string &src, int &equalSignPos) {
 
 //Private method. It parse computational string
 int EquationProc::ParseComputeStr(std::string &src, std::string &error) {
-	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
+	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
+										"acos", "asin", "atan", "ceil", "floor", "cosh",
+										"log", "logt", "tanh", "deg", "sinh" };
 	std::string parse;
 	for (int i = 0; i < src.size(); ++i) {
 		if (std::isalpha(src[i])) {
@@ -338,18 +386,18 @@ int EquationProc::ParseComputeStr(std::string &src, std::string &error) {
 				{ parse.clear(); continue ; }
 			if (src[i] == '(') {
 				if (auto search = vars.find(parse); search != vars.end())
-					return RetError(error, "\nerror: this is variable, not a function", i, src);
+					return RetError(error, "\nerror: this is variable, not a function", i - 1, src);
 				if (auto search = matricies.find(parse); search != matricies.end())
-					return RetError(error, "\nerror: this is a matrix, not a function", i, src);
+					return RetError(error, "\nerror: this is a matrix, not a function", i - 1, src);
 				if (auto search = funcs.find(parse); search == funcs.end())
-					return RetError(error, "\nerror: there is no such function", i, src);
+					return RetError(error, "\nerror: there is no such function", i - 1, src);
 			} else {
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
-					return RetError(error, "\nerror: this is function, not a variable", i, src);
+					return RetError(error, "\nerror: this is function, not a variable", i - 1, src);
 				if (auto search = funcs.find(parse); search != funcs.end())
-					return RetError(error, "\nerror: this is function, not a variable", i, src);
+					return RetError(error, "\nerror: this is function, not a variable", i - 1, src);
 				if (auto search = vars.find(parse); search == vars.end())
-					return RetError(error, "\nerror: there is no such variable", i, src);
+					return RetError(error, "\nerror: there is no such variable", i - 1, src);
 				if (auto search = matricies.find(parse); search != matricies.end())
 					isMatrix = true;
 				else
@@ -367,7 +415,7 @@ int EquationProc::RetError(std::string &error, const std::string &errMsg,
 			 const int &i, const std::string &src) {
 	error = src;
 	error.push_back('\n');
-	error.insert(error.size(), i - 1, ' ');
+	error.insert(error.size(), i, ' ');
 	error.push_back('^');
 	error += errMsg;
 	return 0;
@@ -403,6 +451,28 @@ void EquationProc::PlotExposeRad(std::string &src) {
 	}
 }
 
+//Expose degree function for plotting function
+void EquationProc::PlotExposeDeg(std::string &src) {
+	//until there will be no 'deg' function in source
+	//string, exchange it
+	while (src.find("deg") != std::string::npos) {
+		//parser index, position of equation beginning
+		//and brace count
+		int i = src.find("deg") + 4, brace = 1;
+		int begin = i;
+		//string for exchange
+		std::string exch;
+
+		while (brace) {
+			if (src[i] == '(') ++brace;
+			else if (src[i] == ')') --brace;
+			++i;
+		}
+		exch = "180 * (" + src.substr(begin, i - begin - 1) + ") / pi";
+		src.replace(src.find("deg"), i - src.find("deg"), exch);
+	}
+}
+
 /*Private submethod. It calculate number of question marks in
 source string. If number is greater than 1, we return 0.
 If there is no queston mark, we stop scenario and return 3. In case of
@@ -412,12 +482,16 @@ the equal sign we return 1, if question is after equal sign
 and some piece of equation - return 2*/
 int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std::string &token) {
 	//Base functions for regular expressions
-	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
+	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
+										"acos", "asin", "atan", "ceil", "floor", "cosh",
+										"log", "logt", "tanh", "deg", "sinh" };
 	//Base functions for matricies
-	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "linfnorm",
+											  "lpnorm", "det", "adj" };
 	int count = 0, order = 0;
 	std::string parse;
-
+	//clear token
+	token.clear();
 	for (int i = 0; i < src.size(); ++i) {
 		if (src[i] == '?') ++count;
 		if (count > 1)
@@ -438,9 +512,9 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 				{ parse.clear(); continue ; }
 			if (src[i] == '(') {
 				if (auto search = vars.find(parse); search != vars.end())
-					return RetError(error, "\nerror: this is variable, not a function", i, src);
+					return RetError(error, "\nerror: this is variable, not a function", i - 1, src);
 				if (auto search = matricies.find(parse); search != matricies.end())
-					return RetError(error, "\nerror: this is a matrix, not a function", i, src);
+					return RetError(error, "\nerror: this is a matrix, not a function", i - 1, src);
 				//If some matrix function is found, we deal with matricies
 				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end())
 					isMatrix = true;
@@ -448,21 +522,24 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 					parse.clear(); continue ;
 				}
 				else if (auto search = funcs.find(parse); search == funcs.end())
-					return RetError(error, "\nerror: there is no such function", i, src);
+					return RetError(error, "\nerror: there is no such function", i - 1, src);
 			} else {
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
-					return RetError(error, "\nerror: this is function, not a variable", i, src);
+					return RetError(error, "\nerror: this is function, not a variable", i - 1, src);
 				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end())
-					{ return RetError(error, "\nerror: this is function, not a variable", i, src); }
+					{ return RetError(error, "\nerror: this is function, not a variable", i - 1, src); }
 				if (auto search = funcs.find(parse); search != funcs.end())
-					return RetError(error, "\nerror: this is function, not a variable", i, src);
-				if (auto search = vars.find(parse); search == vars.end() && !token.empty())
-					return RetError(error, "\nerror: there is no such variable", i, src);
+					return RetError(error, "\nerror: this is function, not a variable", i - 1, src);
 				//If some matrix is found, we deal with matricies
-				else if (auto search = matricies.find(parse); search != matricies.end())
+				if (auto search = matricies.find(parse); search != matricies.end())
 					isMatrix = true;
 				else if (auto search = vars.find(parse); search == vars.end() && token.empty())
+					{ token = parse; parse.clear(); continue; }
+				else if (auto search = vars.find(parse); search == vars.end() && !token.empty() && parse != token)
+					return RetError(error, "\nerror: there is no such variable", i, src);
+				else if (auto search = vars.find(parse); search == vars.end() && token.empty())
 					token = parse;
+				else if (!token.empty() && parse == token) { parse.clear(); continue ; }
 				else
 					src.replace(src.find(parse), parse.size(), vars[parse]);
 			}
@@ -485,6 +562,9 @@ int EquationProc::QuestionMarkPreview(std::string &src, std::string &error, std:
 		else if (src[i] == ']' || src[i] == '[')
 			isMatrix = true;
 	}
+	//If we deal with matricies and there is token, return error
+	if (!token.empty() && isMatrix)
+		{ error = "error: " + src + ": there can be no token in matrix equation"; return 0; }
 	return (order == 4) ? 1 : 2;
 }
 
@@ -493,9 +573,12 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 									std::string &name, const std::string &oldValue) {
 	std::string parse, errorPrefix;
 	//Set of base functions for regular values
-	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad" };
+	std::set<std::string> baseFuncs = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
+										"acos", "asin", "atan", "ceil", "floor", "cosh",
+										"log", "logt", "tanh", "deg", "sinh" };
 	//Set of base functions for matricies
-	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "det", "adj" };
+	std::set<std::string> baseMatrixFuncs = { "inv", "transp", "lonenorm", "ltwonorm", "linfnorm",
+											  "lpnorm", "det", "adj" };
 	//Set error prefix, depends on if we deal with function or not
 	errorPrefix = ((isFunc) ? name + "(" + funcs[name].token + ")" + " = " : name + " = ");
 
@@ -509,23 +592,23 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 				//errorPrefix =  name + "(" + funcs[name].token + ")" + " = ";
 				if (isFunc && parse.size() == name.size() &&!parse.compare(name))
 					return RetError(error, "\nerror: recursive function call is unexceptable!",
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 				if (auto search = vars.find(parse); search != vars.end())
 					return RetError(error, "\nerror: this is variable, not a function: " + parse,
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 				if (auto search = matricies.find(parse); search != matricies.end())
 					return RetError(error, "\nerror: this is a matrix, not a function: " + parse,
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
 					{ parse.clear(); continue ; }
 				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end() && !isFunc)
 					{ isMatrix = true; parse.clear(); continue ; }
 				if (auto search = funcs.find(parse); search == funcs.end())
 					return RetError(error, "\nerror: there is no such function: " + parse,
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 				if (auto search = baseMatrixFuncs.find(parse); search != baseMatrixFuncs.end() && isFunc)
 					return RetError(error, "\nerror: " + parse + ": matrix function in function equation is not supported:",
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 			}
 			else {
 				//errorPrefix = name + " = ";
@@ -533,25 +616,25 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 					{ parse.clear(); continue; }
 				if (auto search = funcs.find(parse); search != funcs.end())
 					return RetError(error, "\nerror: this is a function, not a variable: " + parse,
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 				if (auto search = baseFuncs.find(parse); search != baseFuncs.end())
 					return RetError(error, "\nerror: this is a function, not a variable: " + parse,
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 				if (!isFunc && parse.size() == name.size() && !parse.compare(name) && !oldValue.empty())
 					src.replace(src.find(parse), parse.size(), oldValue);
 				else if (!isFunc && parse.size() == name.size() && !parse.compare(name) && oldValue.empty())
 					return RetError(error, "\nerror: there is no previous declaration of '" + name + "' variable",
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 				if (auto search = matricies.find(parse); search != matricies.end() && isFunc)
 					return RetError(error, "\nerror: " + parse + ": matrix variable in function equation is not supported:",
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 				if (auto search = matricies.find(parse); search != matricies.end())
 					isMatrix = true;
 				else if (auto search = vars.find(parse); search != vars.end())
 					src.replace(src.find(parse), parse.size(), vars[parse]);
 				else
 					return RetError(error, "\nerror: there is no such variable: " + parse,
-									i + errorPrefix.size(), errorPrefix + src);
+									i + errorPrefix.size() - 1, errorPrefix + src);
 			}
 			parse.clear();
 			//If character is left or right squarebrace, we deal with matrix
@@ -572,8 +655,10 @@ int EquationProc::InitEquationParse(std::string &src, std::string &error,
 
 //Output operation history into the output stream
 void EquationProc::HistoryOutput() {
+	std::cout << std::endl;
 	for (std::string var : history)
 		std::cout << var << std::endl;
+	std::cout << std::endl;
 }
 
 //Output list of all available variables
@@ -583,6 +668,7 @@ void EquationProc::VariablesOutput() {
 	//Matricies iterator
 	std::map<std::string, Matrix>::iterator itMap = matricies.begin();
 
+	std::cout << std::endl;
 	//Regular variables output
 	std::cout << "Variables:" << std::endl;
 	for ( ; it != vars.end(); ++it)
@@ -591,6 +677,7 @@ void EquationProc::VariablesOutput() {
 	std::cout << "Matricies:" << std::endl;
 	for ( ; itMap != matricies.end(); ++itMap)
 		std::cout << itMap->first << ':' << std::endl << itMap->second.toString();
+	std::cout << std::endl;
 }
 
 //Plotting function
@@ -682,6 +769,7 @@ void EquationProc::PlotFunction(const std::string &src) {
         //Exchange 'rad' function in function
         //string, that should be plotted
         PlotExposeRad(toPlot);
+		PlotExposeDeg(toPlot);
         //plot fixed string
         gp << "plot " << toPlot << std::endl;
 }

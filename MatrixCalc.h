@@ -7,17 +7,20 @@
 
 #include "Matrix.h"
 #include <stack>
+#include <vector>
 
 class MatrixCalc {
 	/*Variable structure. It has either matrix
 	or regular equation. It also has state
 	value: 0 - it's operation, 1 - it's matrix,
 	2 - it's regular expression, 3 - it's token,
-	 4 - it's error*/
+	 4 - it's error, 5 - it's brace*/
 	struct value {
 		int state;
 		Matrix matrix;
 		std::string eq;
+		//vector of values in case of complex expressions
+		std::vector<value> vec;
 	};
 
 	//Set of functions. Reference value
@@ -79,7 +82,7 @@ class MatrixCalc {
 	//Inverse matrix
 	value Inv(const Matrix &src);
 	//Expose function and replace token
-	std::string funcExpose(const Func &src, const std::string &forReplace);
+	//std::string funcExpose(const Func &src, const std::string &forReplace);
 	//Execute function block, no matter it's for matricies, regular expression
 	//or it's some user defined
 	value funcExprExec(const std::string &oper, std::stack<value> &nums);
@@ -95,6 +98,10 @@ class MatrixCalc {
 	value MatrixNumMulti(const value &f, const value &s);
 	//Matrix power raising. 'f' is a matrix, 's' should be integer number
 	value MatrixPowerRaise(const value &f, const value &s);
+	//Denomination elements for regular expression
+	std::list<std::string> DenomElems(const std::string &src);
+	//Generating string in case of error, or in case of result
+	std::string FinResGenerate(const value &val, const bool &isError);
 public:
 	//Default constructor
 	MatrixCalc() = delete;

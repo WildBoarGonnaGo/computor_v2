@@ -17,7 +17,7 @@ int main(void) {
 	//std::cout << "Kekw, Nigga!" << std::endl;
 	// return 0;
 
-	RevPolTest("1 + 2", 1);
+	/*RevPolTest("1 + 2", 1);
 	RevPolTest("1 + 2 - 3", 2);
 	RevPolTest("1 * 2 / 3", 3);
 	RevPolTest("1 + 2 * 3", 4);
@@ -136,7 +136,10 @@ int main(void) {
 	proc.HistoryOutput();
 	//Output of all variables
 	std::cout << std::endl << "Output of all declared variables:" << std::endl;
-	proc.VariablesOutput();
+	proc.VariablesOutput();*/
+
+	//Procedure manager
+	EquationProc proc;
 
 	std::cout << "Computor (v2) by lchantel. Enjoy..." << std::endl;
 	 while (true) {

@@ -145,7 +145,8 @@ void computor::fract() {
 		fract();
 		return ;
 	}
-	if (*it && *(it++) != '*' && if_arg) syntax_err();
+	if (*it && *it != '*' && if_arg) syntax_err();
+	++it;
 	if (!*it || !errMsg.empty()) return ;
 	if (!if_arg) --it;
 	pass();
@@ -155,7 +156,9 @@ void computor::fract() {
 	++it;
 	if (!*it || !errMsg.empty()) return ;
 	pass();
-	aux_degree = (*(it++) == '^') ? get_int_number() : 1;
+	//aux_degree = (*(it++) == '^') ? get_int_number() : 1;
+	if (*it == '^') { ++it; aux_degree = get_int_number();}
+	else aux_degree = 1;
 	if (aux_degree > polys->size() - 1) {
 		polys->resize(aux_degree + 1);
 		degree = aux_degree;

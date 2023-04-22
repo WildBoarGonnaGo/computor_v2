@@ -56,6 +56,8 @@ class EquationProc {
 	int RetExprError(const std::string &error);
 	//Expose radian function for plotting function
 	void PlotExposeRad(std::string &src);
+	//Expose degree function for plotting function
+	void PlotExposeDeg(std::string &src);
 public:
 	EquationProc();
 	//Add equation: either function or variable, or some equation.

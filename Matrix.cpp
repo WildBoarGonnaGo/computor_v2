@@ -153,7 +153,8 @@ Matrix::Matrix(const std::string &src,
 	   matrix(src), row(0), column(0), funcs(funcSrc), matricies(matrixSrc),
 	   token(tokenSrc), tokenIsMatrix(tokenIsMatrixSrc) {
 	//Set of basic matrix functions
-	std::set<std::string> baseFuncsMatrix = { "inv", "transp", "l1norm", "l2norm" };
+	std::set<std::string> baseFuncsMatrix = { "inv", "transp", "lonenorm", "ltwonorm", "linfnorm",
+											  "lpnorm", "det", "adj" };
 
 	//Let's check if token is matrix, if it's return error
 	if (!token.empty() && matrix.find(token) != std::string::npos && tokenIsMatrix == 1) {
