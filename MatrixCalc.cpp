@@ -1044,9 +1044,9 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		//In case of power raising
 		else if (oper == "^") res = MatrixPowerRaise(first, second);
 	}
-	//In case of first variable is a regular expression (or token) and second is a matrix
-	else if ((first.state == 2 || first.state == 3) && second.state == 1) {
-		//In case of multiplication
+	//In case of first variable is a regular expression and second is a matrix
+	else if (first.state == 2 && second.state == 1) {
+		//In case of multiplication of regular expression and matrix
 		if (oper == "*") res = MatrixNumMulti(first, second);
 		//In case of summation return error
 		else if (oper == "+") {
@@ -1088,24 +1088,39 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 	}
 	//If first variable is matrix and second is token
 	else if (first.state == 1 && second.state == 3) {
-		if (oper == "*" || oper == "-" || oper == "+" || oper == "^") {
-			//operation value
-			value operVal;
-			operVal.state = 0;
-			operVal.eq = oper;
-
-			res.vec.push_back(first);
-			res.vec.push_back(operVal);
-			res.vec.push_back(second);
-		}
-		if (oper == "/") {
+		//In case of matrix and token multiplication
+		if (oper == "*")
+			res = MultiTokenMatrix(first, second);
+		//In case of matrix and token division
+		else if (oper == "/") {
 			//Temporary value for further calculations
 			value tmp; tmp.eq = "1 / (" + second.eq + ")";
 			res = MatrixNumMulti(tmp, first);
 		}
-		res.state = 1;
+		//In other cases just add operator
+		else
+			res = AddOperTokenMatrix(oper, first, second);
 	}
 	//If first variable is token and second is matrix
+	else if (first.state == 3 && second.state == 1) {
+		//In case of token and matrix multiplication
+		if (oper == "*")
+			res = MultiTokenMatrix(first, second);
+		//In case of division return error
+		else if (oper == "/") {
+			error = "error: '/': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": division of regular expression and matrix is not permitted";
+			res.state = 4;
+		}
+		//In case of power raise return error
+		else if (oper == "^") {
+			error = "error: '^': " + FinResGenerate(first, true) + ": "
+				+ FinResGenerate(second, true) + ": regular expression raising to a matrix is not permitted";
+			res.state = 4;
+		}
+		//In other cases just add the operation
+		else res = AddOperTokenMatrix(oper, first, second);
+	}
 	return res;
 }
 
@@ -1331,7 +1346,7 @@ std::list<std::string> MatrixCalc::DenomElems(const std::string &src) {
 //Generating string in case of error, or in case of result
 std::string MatrixCalc::FinResGenerate(const value &val, const bool &isError) {
 	//If source value's list is empty return it corresponding string
-	if (val.vec.empty()) {
+	if (val.lst.empty()) {
 		//In case of regular expression or token
 		if (val.state == 2 || val.state == 3) return val.eq;
 		//In case of matrix and calculating error
@@ -1343,39 +1358,107 @@ std::string MatrixCalc::FinResGenerate(const value &val, const bool &isError) {
 	std::string res;
 	//In other case generate result with
 	//vector parsing, result string
-	for (int i = 0; i < val.vec.size(); ++i) {
+	for (auto it = val.lst.begin(); it != val.lst.end(); ++it) {
 		//In case of first element just append it to string
-		if (!i) {
+		if (it == val.lst.begin()) {
 			//In case of matrix
-			if (val.vec[i].state == 1) res.append(val.vec[i].matrix.getMatrix());
+			if (it->state == 1) res.append(it->matrix.getMatrix());
 			//In case of regular expression
-			else if (val.vec[i].state == 2) res.append(val.vec[i].eq);
+			else if (it->state == 2) res.append(it->eq);
 			//In case of operator (function)
-			else if (!val.vec[i].state) res.append(val.vec[i].eq);
+			else if (!it->state) res.append(it->eq);
 			//In case of brace
-			else if (val.vec[i].state == 5) res.append(val.vec[i].eq);
+			else if (it->state == 5) res.append(it->eq);
 		}
 		//In other cases parse looking forward operations
 		//In case of some function or base operator
-		if (!val.vec[i].state) {
+		if (!it->state) {
 			//Search among base regular functions
-			auto s = baseFuncsReg.find(val.vec[i].eq);
+			auto s = baseFuncsReg.find(it->eq);
 			//Search among base matrix functions
-			auto sm = baseFuncsMatrix.find(val.vec[i].eq);
+			auto sm = baseFuncsMatrix.find(it->eq);
 
 			//If function was found append function name and brace
 			//after it
 			if (s != baseFuncsReg.end() || sm != baseFuncsMatrix.end()) {
-				res.append(val.vec[i++].eq); res.append(val.vec[i].eq);
+				res.append(it->eq); //res.append(val.vec[i].eq);
 			}
 			//In other cases just append operation with spaces
-			else res.append(" " + val.vec[i].eq + " ");
+			else res.append(" " + it->eq + " ");
 		}
 		//In case of matrix
-		else if (!val.vec[i].state == 1) res.append(val.vec[i].matrix.getMatrix());
+		else if (it->state == 1) res.append(it->matrix.getMatrix());
 		//in other cases just append vector element
-		else res.append(val.vec[i].eq);
+		else res.append(it->eq);
 	}
+	return res;
+}
+
+MatrixCalc::value MatrixCalc::MultiTokenMatrix(const value &f, const value &s) {
+	//Let determine token and matrix value
+	value token = (f.state == 3) ? f : s;
+	value matrix = (f.state == 3) ? s : f;
+	//Result value
+	value res;
+	//number of braces
+	int brace = 0;
+
+	//In case of complex matrix value
+	if (!matrix.lst.empty()) {
+		for (auto it = matrix.lst.begin(); it != matrix.lst.end(); ++it) {
+			//If we have '+' or '-' operation and no
+			//braces encounter we multiplicate token
+			//and intermidiate value
+			if (it->state == 0 && !brace && (it->eq == "+" || it->eq == "-")) {
+				res.lst.push_back(value(0, "*"));
+				res.lst.push_back(token);
+			}
+			//In case of open brace increment brace counter
+			else if (it->state == 5 && it->eq == "(") ++brace;
+			//In case of close brace decrement brace counter
+			else if (it->state == 5 && it->eq == ")") --brace;
+			res.lst.push_back(*it);
+		}
+		res.lst.push_back(value(0, "*"));
+		res.lst.push_back(token);
+		res.state = 1;
+		return res;
+	}
+	res.state = 1;
+	res.lst.push_back(f);
+	res.lst.push_back(value(0, "*"));
+	res.lst.push_back(s);
+	return res;
+}
+
+//Add operation for token and matrix
+MatrixCalc::value MatrixCalc::AddOperTokenMatrix(const std::string &oper, const value &f,
+							 const value &s) {
+	//Result value
+	value res;
+	//Token value
+	value token = (f.state == 3) ? f : s;
+	//Matrix value
+	value matrix = (f.state == 1) ? f : s;
+
+	//In case of complex matrix value
+	if (!matrix.lst.empty()) {
+		res.lst = matrix.lst;
+		//If we deal with power raising add braces
+		//besides of power raising
+		if (oper == "^") {
+			res.lst.push_front(value(5, "("));
+			res.lst.push_back(value(5, ")"));
+		}
+		//Add operation to the end of the list
+		res.lst.push_back(value(0, oper));
+		res.lst.push_back(token);
+		res.state = 1;
+		return res;
+	}
+	res.lst.push_back(f);
+	res.lst.push_back(value(0, oper));
+	res.lst.push_back(s);
 	return res;
 }
 

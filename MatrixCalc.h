@@ -7,7 +7,7 @@
 
 #include "Matrix.h"
 #include <stack>
-#include <vector>
+#include <list>
 
 class MatrixCalc {
 	/*Variable structure. It has either matrix
@@ -19,8 +19,15 @@ class MatrixCalc {
 		int state;
 		Matrix matrix;
 		std::string eq;
-		//vector of values in case of complex expressions
-		std::vector<value> vec;
+		//List of values in case of complex expressions
+		std::list<value> lst;
+		//Default constructor
+		value() { }
+		//Parametrized constructor with state only
+		value(const int &s, const std::string &e = std::string(),
+			  const Matrix &m = Matrix(),
+			  const std::list<value> &v = std::list<value>()) :
+			state(s), matrix(m), eq(e), lst(v) { }
 	};
 
 	//Set of functions. Reference value
@@ -102,6 +109,11 @@ class MatrixCalc {
 	std::list<std::string> DenomElems(const std::string &src);
 	//Generating string in case of error, or in case of result
 	std::string FinResGenerate(const value &val, const bool &isError);
+	//Multiplication of token and matrix
+	value MultiTokenMatrix(const value &f, const value &s);
+	//Add operation for token and matrix
+	value AddOperTokenMatrix(const std::string &oper, const value &f,
+							 const value &s);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
