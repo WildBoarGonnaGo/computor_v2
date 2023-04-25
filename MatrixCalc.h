@@ -101,7 +101,7 @@ class MatrixCalc {
 	//Matrix elements multiply results for socket
 	value MatrixSocketMultiply(const Matrix &f, const Matrix &s, int row, int column);
 	//Matricies multiplication
-	value MatrixMulti(const Matrix &f, const Matrix &s);
+	value MatrixMulti(const value &f, const value &s);
 	//Number and Matrix multiplication. 'f' is a regular expression, 's' is a matrix
 	value MatrixNumMulti(const value &f, const value &s);
 	//Matrix power raising. 'f' is a matrix, 's' should be integer number
@@ -124,6 +124,11 @@ class MatrixCalc {
 	//Summing or Subtracting of simple matrix and complex matrix
 	value SimpleComplexMatrixSumSub(const value &sm, const value &cm,
 									const std::string &oper);
+	//Summing and subtracting in case when both values are complex matrix equations
+	value ComplexComplexMatrixSumSub(const value &fcm, const value &scm,
+									 const std::string &oper);
+	//Multiplying of simple matrix and complex matrix equation
+	value SimpleComplexMatrixMulti(const value &f, const value &s);
 public:
 	//Default constructor
 	MatrixCalc() = delete;

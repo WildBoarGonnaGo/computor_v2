@@ -1005,7 +1005,7 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		//in case of summing and subtract
 		if (oper == "+" || oper == "-") res = MatriciesSumSub(oper, first, second);
 		//in case of multiplication
-		else if (oper == "*") res = MatrixMulti(first.matrix, second.matrix);
+		else if (oper == "*") res = MatrixMulti(first, second);
 		//In case of division operation return error
 		else if (oper == "/") {
 			error = "error: '/': " + FinResGenerate(first, true) + ": "
@@ -1134,6 +1134,13 @@ MatrixCalc::value MatrixCalc::MatriciesSumSub(const std::string &oper,
 	//simple matrix
 	if (!first.lst.empty() && second.lst.empty())
 		return ComplexSimpleMatrixSumSub(first, second, oper);
+	//In case of first value is simple matrix and the second is
+	//complex matrix equation
+	if (first.lst.empty() && !second.lst.empty())
+		return SimpleComplexMatrixSumSub(first, second, oper);
+	//In case of both values are complex matrix equations
+	if (!first.lst.empty() && !second.lst.empty())
+		return ComplexComplexMatrixSumSub(first, second, oper);
 	//Compare size of matricies. If their's sizes are not equal, return error
 	if (first.matrix.getRow() != second.matrix.getRow() &&
 			first.matrix.getRow() != second.matrix.getColumn()) {
@@ -1199,20 +1206,23 @@ MatrixCalc::value MatrixCalc::MatrixSocketMultiply(const Matrix &f, const Matrix
 }
 
 //Matricies multiplication
-MatrixCalc::value MatrixCalc::MatrixMulti(const Matrix &f, const Matrix &s) {
+MatrixCalc::value MatrixCalc::MatrixMulti(const value &f, const value &s) {
 	//Result value
 	 value res;
+
+	//In case of first value is simple matrix and
+	//second is complex matrix equation
 
 	//if number of columns of 'f' matrix doesn't equal
 	//to number of rows of 's' matrix return error
 	//and return empty matrix
-	if (f.getColumn() != s.getRow()) {
-		error = "error: first matrix (" + f.getMatrix() + ") number of columns isn't equal\n"
-			+ "to number of rows of second matrix (" + s.getMatrix() + ")";
+	if (f.matrix.getColumn() != s.matrix.getRow()) {
+		error = "error: first matrix (" + f.matrix.getMatrix() + ") number of columns isn't equal\n"
+			+ "to number of rows of second matrix (" + s.matrix.getMatrix() + ")";
 		res.state = 4;
 	}
 	//Number of rows and columns of result matrix
-	int row = f.getRow(), column = s.getColumn();
+	int row = f.matrix.getRow(), column = s.matrix.getColumn();
 	//Values of result matrix
 	std::vector<std::string> values(row * column);
 	//Assigning result matricies number of rows and number of columns
@@ -1221,7 +1231,7 @@ MatrixCalc::value MatrixCalc::MatrixMulti(const Matrix &f, const Matrix &s) {
 		for (int j = 0; j < column; ++j) {
 			//Temporary value. If there was error due socket calculation
 			//return error
-			value tmp = MatrixSocketMultiply(f, s, i, j);
+			value tmp = MatrixSocketMultiply(f.matrix, s.matrix, i, j);
 			if (tmp.state == 4) return tmp;
 			values[i * column + j] = tmp.eq;
 		}
@@ -1329,7 +1339,7 @@ MatrixCalc::value MatrixCalc::MatrixPowerRaise(const value &f, const value &s) {
 	res = f;
 	//Matrix raising. In case of error, return it
 	for (int i = 1; i < bound; ++i) {
-		res = MatrixMulti(res.matrix, f.matrix);
+		res = MatrixMulti(res, f);
 		if (res.state == 4) return res;
 	}
 	return res;
@@ -1535,6 +1545,12 @@ MatrixCalc::value MatrixCalc::ComplexSimpleMatrixSumSub(const value &cm, const v
 	bool isMatrixPure = true;
 	//'Was matrix (sm) computated' value
 	bool comp = false;
+	//sign multiplyer (it can be '-1' or 1)
+	std::string multi;
+	//number of braces
+	int brace = 0;
+	//Sign iterator
+	auto sIt = res.lst.rbegin();
 
 	//Search for pure matrix (there is just matrix, and that's all,
 	//without any multiplying part and functions). And if there is
@@ -1546,20 +1562,52 @@ MatrixCalc::value MatrixCalc::ComplexSimpleMatrixSumSub(const value &cm, const v
 		//In case of non-matrix value (if it's operation go to next section)
 		//set 'isMatrixPure' as false
 		else if (it->state != 1 && it->state) isMatrixPure = false;
-		//In case of summing of subtracting operation and we don't deal
-		//with pure Matrix, set isMatrixPure for next iteration
-		else if (!it->state && (it->eq == "+" || it->eq == "-") && !isMatrixPure)
+		//In case of summing or subracting inside braces (in case of
+		//power raising or some matrix function), set 'isMatrixPure' state
+		//as false
+		else if (!it->state && (it->eq == "+" || it->eq == "-") && brace)
+			isMatrixPure = false;
+		//In case of summing or subtracting operation and not pure matrix
+		//to operate with, reset 'isMatrixPure' value as true and set multiplier
+		//for next iteration
+		else if (!it->state && (it->eq == "+" || it->eq == "-") && !brace
+				 && !isMatrixPure) {
+			//Set multiplier according to encountered sign
+			multi = (it->eq == "-") ? "-1" : "1";
+			//Reset 'isMatrixPure' state as true
 			isMatrixPure = true;
-		//In other cases we check 'isMatrixPure' value, and if it's pure
-		//perform operation
-		else if (isMatrixPure && !comp) {
+			//Fix position of the last sign
+			res.lst.push_back(*it);
+			sIt = res.lst.rbegin();
+			//Continue iterations
+			continue;
+		}
+		//In case of summing or subtracting operation
+		//with pure Matrix, let's make computation, if it wasn't
+		//done yet
+		else if (!it->state && (it->eq == "+" || it->eq == "-") && isMatrixPure
+				 && !brace) {
+			//In case of negative multiplier, let's perform
+			//an additional multiply operation
+			if (multi == "-1") {
+				res.lst.back() = Execute("*", value(2, "-1"), res.lst.back());
+				//In case of error return it
+				if (res.lst.back().state == 4) return res.lst.back();
+				sIt->eq = "+";
+			}
 			//Computation is performed
 			comp = true;
 			//Push calculating result
-			res.lst.push_back(Execute(oper, res.lst.back(), sm));
+			res.lst.back() = Execute(oper, res.lst.back(), sm);
 			//If there is error return it
 			if (res.lst.back().state == 4) return res.lst.back();
+			//Reset 'isMatrixPure' state as true
+			isMatrixPure = true;
 		}
+		//In case of open brace increment brace counter
+		if (it->state == 5 && it->eq == "(") ++brace;
+		//In case of close brace decrement brace counter
+		if (it->state == 5 && it->eq == ")") --brace;
 		res.lst.push_back(*it);
 	}
 	//If in the iteration end we have pure matrix and computation is
@@ -1644,6 +1692,12 @@ MatrixCalc::value MatrixCalc::SimpleComplexMatrixSumSub(const value &sm, const v
 			tmp.clear();
 			//Reset pure matrix state variable
 			isMatrixPure = true;
+			//If foper is '-' and we deal with subracting operation
+			//in complex matrix, than we change foper to '+'
+			if (it->eq == "-" && foper == "-") foper = "+";
+			//In case of 'foper' is '+' and we deal with subtracting operation
+			//in complex matrix, change foper to '-'
+			if (it->eq == "-" && foper == "+") foper = "-";
 			//Go to next iteration
 			continue ;
 		}
@@ -1673,6 +1727,136 @@ MatrixCalc::value MatrixCalc::SimpleComplexMatrixSumSub(const value &sm, const v
 	return res;
 }
 
+//Summing and subtracting in case when both values are complex matrix equations
+MatrixCalc::value MatrixCalc::ComplexComplexMatrixSumSub(const value &fcm, const value &scm,
+									 const std::string &oper) {
+	//Result value
+	value res;
+	//Multiplier sign
+	std::string multi;
+	//'Is matrix pure' state value
+	bool isMatrixPure = true;
+	//brace counter
+	int brace = 0;
+	//'was computation performed' state value
+	bool comp = false;
+	//Sign iterator
+	auto sIt = res.lst.rbegin();
+
+	//Let's iterate over the list of first value
+	for (auto fIt = fcm.lst.begin(); fIt != fcm.lst.end(); ++fIt) {
+		//In case of operation value and operation is not subtraction
+		//or summing set 'isMatrixPure' as false
+		if (!fIt->state && fIt->eq != "+" && fIt->eq != "-") isMatrixPure = false;
+		//In case of non-matrix value (if it's operation go to next section)
+		//set 'isMatrixPure' as false
+		else if (fIt->state != 1 && fIt->state) isMatrixPure = false;
+		//In case of summing or subracting inside braces (in case of
+		//power raising or some matrix function), set 'isMatrixPure' state
+		//as false
+		else if (!fIt->state && (fIt->eq == "+" || fIt->eq == "-") && brace)
+			isMatrixPure = false;
+		//In case of summing or subtracting operation and not pure matrix
+		//to operate with, reset 'isMatrixPure' value as true and set multiplier
+		//for next iteration
+		else if (!fIt->state && (fIt->eq == "+" || fIt->eq == "-") && !brace
+				 && !isMatrixPure) {
+			//Set multiplier according to encountered sign
+			multi = (fIt->eq == "-") ? "-1" : "1";
+			//Reset 'isMatrixPure' state as true
+			isMatrixPure = true;
+			//Assign 'sIt' iterator to current iterator
+			res.lst.push_back(*fIt);
+			sIt = res.lst.rbegin();
+		}
+		//In case of summing or subtracting operation
+		//with pure Matrix, let's make computation, if it wasn't
+		//done yet
+		else if (!fIt->state && (fIt->eq == "+" || fIt->eq == "-") && isMatrixPure
+				 && !brace) {
+			//In case of negative multiplier, let's perform
+			//an additional multiply operation
+			if (multi == "-1") {
+				res.lst.back() = Execute("*", value(2, "-1"), res.lst.back());
+				//In case of error return it
+				if (res.lst.back().state == 4) return res.lst.back();
+				//change value of 'sIt' iterator depending on sign
+				sIt->eq = "+";
+			}
+			//auxiliary value
+			value aux;
+			//Let's calculate value 'SimpleComplexMatrixSumSub'
+			aux = SimpleComplexMatrixSumSub(res.lst.back(), scm, oper);
+			//Push these values from aux to result value
+			for (auto itAux = aux.lst.begin(); itAux != aux.lst.end(); ++itAux) {
+				if (itAux == aux.lst.begin()) res.lst.back() = *itAux;
+				else res.lst.push_back(*itAux);
+			}
+			//If there was computation error, return it
+			if (res.lst.back().state == 4) return res.lst.back();
+			//Computation is peformed so set 'comp' as true;
+			comp = true;
+		}
+		//In case of open brace increment brace counter
+		if (fIt->state == 5 && fIt->eq == "(") ++brace;
+		//In case of close brace decrement brace counter
+		if (fIt->state == 5 && fIt->eq == ")") --brace;
+		res.lst.push_back(*fIt);
+	}
+	//Set state of result as matrix
+	res.state = 1;
+	//If no computation was performed just push
+	//elements of second value list
+	if (!comp) {
+		//If operation is binary '-' set multi as '-1'
+		multi = "-1";
+		//Reset brace variable
+		brace = 0;
+		for (auto it = scm.lst.begin(); it != scm.lst.end(); ++it) {
+			//If we only starting iteration, add binary operation
+			//represented in oper variable
+			if (it == scm.lst.begin()) res.lst.push_back(value(0, oper));
+			//If we deal with base operator and not inside braces
+			//(in case of power raising functin or some base matrix
+			//function check it
+			else if (!it->state && (it->eq == "+" || it->eq == "-") && !brace) {
+				//If multi is a negative number change sign
+				//And continue iteration
+				if (multi == "-1") {
+					res.lst.push_back(value(0, (it->eq == "-") ? "+" : "-"));
+					continue ;
+				}
+			}
+			//In case of open brace increment brace variable
+			else if (it->state == 5 && it->eq == "(") ++brace ;
+			//In case of close brace decrement brace variable
+			else if (it->state == 5 && it->eq == ")") --brace;
+			res.lst.push_back(*it);
+		}
+	}
+	return res;
+}
+
+//Multiplying of simple matrix and complex matrix equation
+MatrixCalc::value MatrixCalc::SimpleComplexMatrixMulti(const value &f, const value &s) {
+	//Result value
+	value res;
+	//Auxiliary value
+	value aux;
+	//brace counter
+	int brace = 0;
+	//'computation' state
+	bool comp = false;
+
+	//Iterate over the list of the second value
+	for (auto it = s.lst.begin(); it != s.lst.end(); ++it) {
+		//In case of open brace increment brace counter
+		if (it->state == 5 && it->eq == "(") ++brace;
+		//In case of close brace decrement brace counter
+		if (it->state == 5 && it->eq == ")") --brace;
+
+	}
+}
 
 //Get error string
 const std::string &MatrixCalc::getError() const { return error; }
