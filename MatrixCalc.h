@@ -8,6 +8,7 @@
 #include "Matrix.h"
 #include <stack>
 #include <list>
+#include <map>
 
 class MatrixCalc {
 	/*Variable structure. It has either matrix
@@ -114,6 +115,15 @@ class MatrixCalc {
 	//Add operation for token and matrix
 	value AddOperTokenMatrix(const std::string &oper, const value &f,
 							 const value &s);
+	/*Multiplying complex matrix equation and regular expression
+	 'm' represents matrix, 'r' represents regular expression*/
+	value MatrixVectorNumMulti(const value &m, const value &r);
+	//Summing or Subtracting of complex matrix and simple matrix
+	value ComplexSimpleMatrixSumSub(const value &cm, const value &sm,
+									const std::string &oper);
+	//Summing or Subtracting of simple matrix and complex matrix
+	value SimpleComplexMatrixSumSub(const value &sm, const value &cm,
+									const std::string &oper);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
