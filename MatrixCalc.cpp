@@ -1847,6 +1847,8 @@ MatrixCalc::value MatrixCalc::SimpleComplexMatrixMulti(const value &f, const val
 	int brace = 0;
 	//'computation' state
 	bool comp = false;
+	//'is function or brace' variable
+	bool funcOrBrace = false;
 
 	//Iterate over the list of the second value
 	for (auto it = s.lst.begin(); it != s.lst.end(); ++it) {
@@ -1854,6 +1856,9 @@ MatrixCalc::value MatrixCalc::SimpleComplexMatrixMulti(const value &f, const val
 		if (it->state == 5 && it->eq == "(") ++brace;
 		//In case of close brace decrement brace counter
 		if (it->state == 5 && it->eq == ")") --brace;
+		//In case of matrix not in inner brace (in case
+		//of power-raising function or some base matrix
+		//function) make multiply operation
 
 	}
 }
