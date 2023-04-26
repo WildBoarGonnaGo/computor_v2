@@ -129,6 +129,12 @@ class MatrixCalc {
 									 const std::string &oper);
 	//Multiplying of simple matrix and complex matrix equation
 	value SimpleComplexMatrixMulti(const value &f, const value &s);
+    //Multiplying of complex matrix equation and simple matrix
+    value ComplexSimpleMatrixMulti(const value &f, const value &s);
+    //Multiplying of complex matrix equations
+    value ComplexComplexMatrixMulti(const value &f, const value &s);
+    //Analizing and modifying complex source value
+    value AnalizeModifyValue(value &&src);
 public:
 	//Default constructor
 	MatrixCalc() = delete;

@@ -1095,7 +1095,22 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		else if (oper == "/") {
 			//Temporary value for further calculations
 			value tmp; tmp.eq = "1 / (" + second.eq + ")";
-			res = MatrixNumMulti(tmp, first);
+			//res = MatrixNumMulti(tmp, first);
+            //If matrix is complex insert values
+            //of first matrix, then multiplication
+            //and temporary value
+            if (!first.lst.empty()) {
+                res.lst.insert(res.lst.end(), first.lst.begin(), first.lst.end());
+                res.lst.insert(res.lst.end(), { value(0, "*"), tmp } );
+            }
+            //In other cases set initialize list of values
+            else res.lst.insert(res.lst.end(), { first, value(0, "*"), tmp } );
+            //Simplify result equation and in case of error due calculation
+            //return it
+            res = AnalizeModifyValue(std::move(res));
+            if (res.state == 4) return res;
+            //Set result as matrix
+            res.state = 1;
 		}
 		//In other cases just add operator
 		else
@@ -1212,7 +1227,12 @@ MatrixCalc::value MatrixCalc::MatrixMulti(const value &f, const value &s) {
 
 	//In case of first value is simple matrix and
 	//second is complex matrix equation
-
+    if (f.lst.empty() && !s.lst.empty()) return SimpleComplexMatrixMulti(f, s);
+    //In case of first value is complex matrix equation
+    //and second is simple matrix value
+    else if (!f.lst.empty() && s.lst.empty()) return ComplexSimpleMatrixMulti(f, s);
+    //In case of both values are complex matrix equations
+    else if (!f.lst.empty() && !s.lst.empty()) return ComplexComplexMatrixMulti(f, s);
 	//if number of columns of 'f' matrix doesn't equal
 	//to number of rows of 's' matrix return error
 	//and return empty matrix
@@ -1853,14 +1873,196 @@ MatrixCalc::value MatrixCalc::SimpleComplexMatrixMulti(const value &f, const val
 	//Iterate over the list of the second value
 	for (auto it = s.lst.begin(); it != s.lst.end(); ++it) {
 		//In case of open brace increment brace counter
-		if (it->state == 5 && it->eq == "(") ++brace;
+        if (it->state == 5 && it->eq == "(") { ++brace; funcOrBrace = true; }
 		//In case of close brace decrement brace counter
-		if (it->state == 5 && it->eq == ")") --brace;
+        else if (it->state == 5 && it->eq == ")") { --brace; funcOrBrace = true; }
 		//In case of matrix not in inner brace (in case
 		//of power-raising function or some base matrix
-		//function) make multiply operation
-
+		//function) and we don't encountered function or brace yet
+        //(funcOrBrace is false) make multiply operation
+        else if (it->state == 1 && !funcOrBrace && !brace) {
+            aux.lst.push_back(Execute("*", f, *it));
+            //If some error occured due calculations, return it
+            if (aux.lst.back().state == 4) return aux.lst.back();
+            //Set computation state as performed
+            comp = true;
+        }
+        //In case of function encountering. set funcOrBrace as true
+        else if (auto s = baseFuncsMatrix.find(it->eq); !it->state && s != baseFuncsMatrix.end())
+            funcOrBrace = true;
+        //In case of summing or subraction that is not inside braces
+        else if (!it->state && (it->eq == "+" || it->eq == "-") && !brace) {
+            //If computation wasn't performed yet, insert to the end
+            //of result list 'f' multiplier and multiplying operation.
+            //Or else reset 'comp' value
+            if (!comp)
+                res.lst.insert(res.lst.end(), { f, value(0, "*") } );
+            else comp = false;
+            //Insert aux list to the result list
+            res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+            //Push current operation value to result list
+            res.lst.push_back(*it);
+            //Clear auxiliary list
+            aux.lst.clear();
+            //Continue iterations
+            continue ;
+        }
+        //Push iterated value to the auxiliary list
+        aux.lst.push_back(*it);
 	}
+    //If computation wasn't performed yet, insert to the end
+    //of result list 'f' multiplier and multiplying operation.
+    if (!comp)
+        res.lst.insert(res.lst.end(), { f, value(0, "*") } );
+    //Insert aux list to the result list
+    res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+    //Set result as matrix
+    res.state = 1;
+    return res;
+}
+
+//Multiplying of complex matrix equation and simple matrix
+MatrixCalc::value MatrixCalc::ComplexSimpleMatrixMulti(const value &f, const value &s) {
+    //Result value
+    value res;
+    //'Is there complex summing or subracting' value
+    //for first and second complex matrix equations
+    bool fComp = false, sComp = false;
+    //Brace counter
+    int brace = 0;
+
+    //Iterate over the first value searching
+    //complex summing or subracting
+    for (auto it = f.lst.begin(); it != f.lst.end(); ++it) {
+        //In case of open brace increment brace counter
+        if (it->state == 5 && it->eq == "(") ++brace;
+        //In case of close brace decrement brace counter
+        else if (it->state == 5 && it->eq == ")") --brace;
+        //In case of summing or subtracting outside the
+        //braces, set 'fComp' variable as true and
+        //break the loop
+        else if (!it->state && (it->eq == "-" || it->eq == "+") && !brace) {
+            fComp = true; break ;
+        }
+    }
+    //Iterate over the second value searching
+    //complex summing or subracting
+    for (auto it = s.lst.begin(); it != s.lst.end(); ++it) {
+        //In case of open brace increment brace counter
+        if (it->state == 5 && it->eq == "(") ++brace;
+        //In case of close brace decrement brace counter
+        else if (it->state == 5 && it->eq == ")") --brace;
+        //In case of summing or subtracting outside the
+        //braces, set 'sComp' variable as true and
+        //break the loop
+        else if (!it->state && (it->eq == "-" || it->eq == "+") && !brace) {
+            sComp = true; break ;
+        }
+    }
+    //In case fComp is true add open brace
+    if (fComp) res.lst.push_back(value(5, "("));
+    //Insert values of first equation to the end of result list
+    res.lst.insert(res.lst.end(), f.lst.begin(), f.lst.end());
+    //In case fComp is true add close brace
+    if (fComp) res.lst.push_back(value(5, ")"));
+    //Add operation value
+    res.lst.push_back(value(0, "*"));
+    //In case sComp is true add open brace
+    if (sComp) res.lst.push_back(value(5, "("));
+    //Insert values of second equation to the end of result list
+    res.lst.insert(res.lst.end(), s.lst.begin(), s.lst.end());
+    //In case sComp is true add close brace
+    if (sComp) res.lst.push_back(value(5, ")"));
+    //Set result state as matrix and return it
+    res.state = 1;
+    return res;
+}
+
+//Analizing and modifying complex source value
+MatrixCalc::value MatrixCalc::AnalizeModifyValue(value &&src) {
+    //Number of braces
+    int brace = 0;
+    //'Were regular expressions computated' state
+    bool regComp = false;
+    //Last matrix value state
+    bool mState;
+    //result value
+    value res;
+    
+    //Multiply regular expressions in value
+    for (auto it = src.lst.begin(); it != src.lst.end(); ++it) {
+        //In case of open brace increment 'brace' value
+        if (it->state == 5 && (it->eq == "(")) { ++brace; mState = false; }
+        //In case of close brace decrement 'brace' value
+        else if (it->state == 5 && (it->eq == ")")) { --brace; mState = false; }
+        //In case of regular expression outside braces
+        //seek for other regular expressions
+        else if (it->state == 2 && !brace && !regComp) {
+            mState = false;
+            //Create auxiliary iterator
+            auto auxIt = it;
+            ++auxIt;
+            //Temporary value
+            value tmp = *it;
+            //Searching other regular expression values
+            //that are not inside braces
+            for ( ; auxIt != src.lst.end(); ++auxIt) {
+                mState = false;
+                //In case of open brace increment 'brace' value
+                if (it->state == 5 && (it->eq == "(")) ++brace;
+                //In case of close brace decrement 'brace' value
+                else if (it->state == 5 && (it->eq == ")")) --brace;
+                //In case of regular expression outside braces
+                else if (auxIt->state == 2 && !brace) {
+                    //Go back to sign and pop it
+                    --auxIt;
+                    auxIt = src.lst.erase(auxIt);
+                    //Calculate value
+                    tmp = Execute("*", tmp, *auxIt);
+                    //In case of error return it
+                    if (tmp.state == 4) return tmp;
+                    //Erase element regular expression element
+                    //from the list
+                    auxIt = src.lst.erase(auxIt);
+                }
+            }
+            //Push temporary value to result list
+            res.lst.push_back(tmp);
+            //Set regular expression computation sequence
+            //as finished
+            regComp = true;
+            //Continue iterations
+            continue ;
+        }
+        //Fix matrix value state outside brace
+        else if (it->state == 2 && !mState) mState = true;
+        //In case multiplication of nearest matricies
+        //Perform multiplication
+        else if (it->state == 2 && mState) {
+            res.lst.back() = Execute("*", res.lst.back(), *it);
+            //In case of error, return it
+            if (res.lst.back().state == 4) return res.lst.back();
+            //Continue iterations
+            continue ;
+        }
+        //In case of multiplying operator and last matrix
+        //value outside braces continue iterations
+        else if (!it->state && it->eq == "*" && mState) continue ;
+        //In other cases we're not encountering pure matrix
+        //so set 'mState' variable as false
+        else mState = false;
+        res.lst.push_back(*it);
+    }
+    //If last element of source list is pure matrix
+    //'mState' is true, perform computations
+    if (mState && src.lst.back().state == 2) {
+        res.lst.back() = Execute("*", res.lst.back(), src.lst.back());
+        //In case of error return it
+        if (res.lst.back().state == 4) return res.lst.back();
+    }
+    //Set final result as matrix and return it
+    res.state = 1;
+    return res;
 }
 
 //Get error string
