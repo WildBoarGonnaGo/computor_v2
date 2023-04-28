@@ -15,7 +15,7 @@ class MatrixCalc {
 	or regular equation. It also has state
 	value: 0 - it's operation, 1 - it's matrix,
 	2 - it's regular expression, 3 - it's token,
-	 4 - it's error, 5 - it's brace*/
+	 4 - it's error, 5 - it's brace, 6 - it's comma*/
 	struct value {
 		int state;
 		Matrix matrix;
@@ -143,6 +143,13 @@ class MatrixCalc {
 	//Summing or subtracting complex regular equation and
 	//simple regular equation
 	value SumSubComplexSimpleRegEq(const std::string &oper, const value &f, const value &s);
+	//Summing or subtracting both complex regular expression
+	value SumSubComplexComplexRegEq(const std::string &oper, const value &f, const value &s);
+	//Complex reg values values analizer for summing and subtraction
+	value ComplexRegEqAnalyzerSumSub(const std::string &oper, const value &f, const value &s);
+	//Iterate over the second value for summing and subtraction
+	value IterateOverSecValueSumSub(const std::string &oper, const value &f, const value &s,
+									const bool &signF, const bool &simF);
 public:
 	//Default constructor
 	MatrixCalc() = delete;

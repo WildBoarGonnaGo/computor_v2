@@ -8,6 +8,7 @@
 #include <limits>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 //Get double number from string
 std::string	MatrixCalc::GetStringNumber(const std::string &str, int &i) {
@@ -2067,6 +2068,7 @@ MatrixCalc::value MatrixCalc::AnalizeModifyValue(value &&src) {
         if (res.lst.back().state == 4) return res.lst.back();
     }
     //Set final result as matrix and return it
+    //Push regular part into the beginning of complex element
     res.state = 1;
     return res;
 }
@@ -2080,6 +2082,9 @@ MatrixCalc::value MatrixCalc::SumSubRegEq(const std::string &oper, const value &
 	if (f.lst.empty() && !s.lst.empty()) return SumSubSimpleComplexRegEq(oper, f, s);
 	//In case the first regular equation is complex and
 	//the second is simple
+	else if (!f.lst.empty() && s.lst.empty()) return SumSubComplexSimpleRegEq(oper, f, s);
+	//In case of both regular equations are complex
+
 }
 
 //Summing or subracting simple regular equation (f) and
@@ -2125,10 +2130,10 @@ MatrixCalc::value MatrixCalc::SumSubSimpleComplexRegEq(const std::string &oper, 
 		else if (it->state == 5 && it->eq == ")") { --brace; pure = false; }
 		//In case of non subract or sum operation set pure as false
 		else if (!it->state && it->eq != "+" && it->eq != "-") pure = false;
-		//In case of subraction or summing pure number and non comp state
-		//perform computations
+		//In case of subraction or summing pure regular equation outside braces
+		//and non comp state perform computations
 		else if (!it->state && (it->eq == "+" || it->eq == "-")
-				 && pure && !comp) {
+				 && pure && !comp && !brace) {
 			//Check sign of interim operation
 			intOper = signStr(oper, sign);
 
@@ -2145,18 +2150,24 @@ MatrixCalc::value MatrixCalc::SumSubSimpleComplexRegEq(const std::string &oper, 
 			aux.lst.clear();
 			continue ;
 		}
-		//Case of summing or subtraction non-pure value,
+		//Case of summing or subtraction non-pure value outside braces,
 		//or pure value in case when computation were already
 		//performed
 		else if (!it->state && (it->eq == "+" || it->eq == "-") &&
-				 (!pure || comp)) {
+				 (!pure || comp) && !brace) {
 			intOper = signStr(oper, sign);
 
 			//Push interim operation and complex regular equation
 			res.lst.push_back(value(0, intOper));
 			res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
-			//Clear auxiliary list and continue iterations
+			//Clear auxiliary list
 			aux.lst.clear();
+			//Reset pure value
+			pure = true;
+			//If current operation is '-' set 'sign' as false
+			//in other case set it as 'true'
+			sign = (it->eq == "+") ? true : false;
+			//Proceed to next iteration
 			continue ;
 		}
 		aux.lst.push_back(*it);
@@ -2180,6 +2191,421 @@ MatrixCalc::value MatrixCalc::SumSubSimpleComplexRegEq(const std::string &oper, 
 	//Set result of value as regular equation and return it
 	res.state = 2;
 	return res;
+}
+
+//Summing or subtracting complex regular equation and
+//simple regular equation
+MatrixCalc::value MatrixCalc::SumSubComplexSimpleRegEq(const std::string &oper, const value &f, const value &s) {
+	//Result value
+	value res;
+	//number of braces
+	int brace = 0;
+	//is value pure state
+	bool pure = true;
+	//sign value. In case of '+' it's true, else it's false
+	//By default it's true
+	bool sign = true;
+	//'were calculations performed' state. By default it's false;
+	bool comp = false;
+	//Auxiliary value
+	value aux;
+
+	//Iterate over the list of the first value
+	for (auto it = f.lst.begin(); it != f.lst.end(); ++it) {
+		//In case of open brace increment brace counter and
+		//set pure as false
+		if (it->state == 5 && it->eq == "(") { ++brace; pure = false; }
+		//In case of close brace decrement brace counter
+		//and set pure as false
+		else if (it->state == 5 && it->eq == ")") { --brace; pure = false; }
+		//In case of non subract or sum operation set pure as false
+		else if (!it->state && it->eq != "+" && it->eq != "-") pure = false;
+		//In case of subraction or summing outside braces
+		//pure regular equation and non comp state perform computations
+		else if (!it->state && (it->eq == "+" || it->eq == "-")
+				 && pure && !comp && !brace) {
+			//Push auxiliary value to list
+			res.lst.push_back(aux.lst.back());
+
+			//Perform calculation between simple equation and
+			//'eq'. If there was error due calculations, return it
+			//Operations depends on sign and base 'oper' value
+			res.lst.back() = Execute((!sign && oper == "-") ? "+" : "-", res.lst.back(), aux.lst.back());
+			if (res.lst.back().state == 4) return res.lst.back();
+			//If current operation is '-' set 'sign' as false
+			//in other case set it as 'true'
+			sign = (it->eq == "+") ? true : false;
+			//Set computation as performed ("true")
+			comp = true;
+			//clear auxiliary list and continue iterations
+			aux.lst.clear();
+			continue ;
+		}
+		//Case of summing or subtraction outside braces non-pure value,
+		//or pure value in case when computation were already
+		//performed
+		else if (!it->state && (it->eq == "+" || it->eq == "-") &&
+				 (!pure || comp) && !brace) {
+			//Insert operation value and aux list to the
+			//end of result list
+			res.lst.push_back(value(0, (!sign) ? "-" : "+"));
+			res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+			//Clear auxiliary list
+			aux.lst.clear();
+			//Reset pure value
+			pure = true;
+			//If current operation is '-' set 'sign' as false
+			//in other case set it as 'true'
+			sign = (it->eq == "+") ? true : false;
+			//Proceed to next iteration
+			continue ;
+		}
+		aux.lst.push_back(*it);
+	}
+	//In case of pure value and not performed computation
+	if (pure && !comp) {
+		//Push auxiliary value to list
+			res.lst.push_back(aux.lst.back());
+
+		//Perform calculation between simple equation and
+		//'eq'. If there was error due calculations, return it
+		//Operations depends on sign and base 'oper' value
+		res.lst.back() = Execute((!sign && oper == "-") ? "+" : "-", res.lst.back(), aux.lst.back());
+		if (res.lst.back().state == 4) return res.lst.back();
+	}
+	//In other case just operation and aux list
+	//to the end of result list
+	else {
+		//Insert operation value and aux list to the
+		//end of result list
+		res.lst.push_back(value(0, (!sign) ? "-" : "+"));
+		res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+	}
+	//Set result of value as regular equation and return it
+	res.state = 2;
+	return res;
+}
+
+//Summing or subtracting both complex regular expression
+MatrixCalc::value MatrixCalc::SumSubComplexComplexRegEq(const std::string &oper, const value &f, const value &s) {
+	//Result value and complex auxiliary values for both
+	//complex values
+	value res, auxF, auxS;
+	//number of braces
+	int brace = 0;
+	//'Is element is simple' state for both equations
+	//By default they're both true
+	bool simF = true, simS = true;
+	//Simple regular equations multiplier
+	//for both complex values
+	value simElemF, simElemS;
+	//sign value. In case of '+' it's true, else it's false
+	//By default it's true. Let's declare signs for both
+	//complex value
+	bool signF = true, signS = true;
+	//Were computations of simple values performed statement
+	//By default it's not, thus it's false
+	bool comp = false;
+	//auxiliary and general lists of computated values
+	std::list<std::list<value>::const_iterator> auxLst, genLst;
+	//Interim operation value
+	std::string interSign = oper;
+	//lambda function. It returns final sign for computation
+	auto finSign = [](const std::string &oper, const bool &signF, const bool &signS) {
+		std::string interSign = oper;
+
+		//Analize first sign and interim operator
+		if (interSign == "-" && !signF) interSign = "+";
+		else if (interSign == "+" && !signF) interSign = "-";
+
+		//Analize second sign and interim operator
+		if (interSign == "-" && !signS) interSign = "+";
+		else if (interSign == "+" && !signS) interSign = "-";
+
+		return interSign;
+	};
+
+	//Iteration over the list of first value
+	for (auto itF = f.lst.begin(); itF != f.lst.end(); ++itF) {
+		//In case of open brace increment brace variable
+		//and set 'simF' as false
+		if (itF->state == 5 && itF->eq == "(") { ++brace, simF = false; }
+		//In case of close brace decrement brace variable
+		//and set 'simF' as false
+		else if (itF->state == 5 && itF->eq == ")") { --brace, simF = false; }
+		//In case of operation statement and not sum or subtract
+		//set 'simF' as false, thus it's not regular equation
+		else if (!itF->state && itF->eq != "+" && itF->eq != "-")
+			simF = false;
+		//In case of summing or subtracting outside braces
+		//Let's iterate over the second complex value
+		else if (!itF->state && (itF->eq == "+" || itF->eq == "-") && !brace) {
+			//Temporary value
+			value tmp;
+			//insert to result list auxiliary value list
+			tmp.lst.insert(tmp.lst.end(), auxF.lst.begin(), auxF.lst.end());
+			//clear first auxiliary list
+			for (auto itS = s.lst.begin(); itS != s.lst.end(); ++itS) {
+				//Assign interim operation to base ('oper') intially
+				interSign = oper;
+				//If element was found in general iterator list
+				//proceed to next iteration, thus it was computed
+				//already
+				if (auto s = std::find(genLst.begin(), genLst.end(), itS); s != genLst.end())
+					continue ;
+				//In case of open brace increment brace variable
+				//and set 'simS' as false
+				if (itS->state == 5 && itS->eq == "(") { ++brace, simS = false; }
+				//In case of close brace decrement brace variable
+				//and set 'simS' as false
+				else if (itS->state == 5 && itS->eq == ")") { --brace, simS = false; }
+				//In case of operation statement and not sum or subtract
+				//set simF as false, thus it's not simple equation
+				else if (!itF->state && itF->eq != "+" && itF->eq != "-")
+					simS = false;
+				//Case of summing or subtracting simple values outside braces
+				else if (!itF->state && (itS->eq == "+" || itS->eq == "-") && !brace
+						 && simF && simS) {
+					//If Auxiliary list is empty proceed iterations
+					if (auxS.lst.empty()) continue ;
+
+					//If result list is not empty check
+					//operation sign
+					if (!res.lst.empty()) interSign = finSign(interSign, signF, signS);
+					//Execute equation, and if there is error, return it
+					tmp.lst.back() = Execute(interSign, tmp.lst.back(), auxS.lst.back());
+					//If there was some error due calculations return it
+					if (tmp.lst.back().state == 4) return tmp.lst.back();
+					//Insert to the end general list of iterators
+					//auxiliary list of iterators
+					genLst.insert(genLst.end(), auxLst.begin(), auxLst.end());
+					//Clear auxiliary lists
+					auxLst.clear(); auxS.lst.clear();
+					//Proceed to next iteration
+					continue ;
+				}
+				//Case of summing or subracting complex values outside braces
+				else if (!itF->state && (itS->eq == "+" || itS->eq == "-")
+						 && !simF && !simS && !brace) {
+					//If Auxiliary list is empty proceed iterations
+					if (auxS.lst.empty()) continue ;
+
+					//If result list is not empty check
+					//operation sign
+					if (!res.lst.empty()) interSign = finSign(interSign, signF, signS);
+					//Calculate temporary value
+					tmp = ComplexRegEqAnalyzerSumSub(interSign, tmp, auxS);
+					//If there was some error due calculation, return it
+					if (tmp.state == 4) return tmp;
+					//Insert to the end general list of iterators
+					//auxiliary list of iterators
+					genLst.insert(genLst.end(), auxLst.begin(), auxLst.end());
+					//Clear auxiliary lists
+					auxLst.clear(); auxS.lst.clear();
+					//Proceed to next iteration
+					continue ;
+				}
+				//Push iterator to iterator auxiliary list of second value list
+				auxLst.push_back(itS);
+				//Push values to auxiliary value list of second value list
+				auxS.lst.push_back(*itS);
+			}
+			//Case of summing or subtracting simple values outside braces
+			if (!brace && simF && simS) {
+				//If Auxiliary list is empty break this statement
+				if (auxS.lst.empty()) break ;
+
+				//If result list is not empty check
+				//operation sign
+				if (!res.lst.empty()) interSign = finSign(interSign, signF, signS);
+				//Execute equation, and if there is error, return it
+				tmp.lst.back() = Execute(interSign, tmp.lst.back(), auxS.lst.back());
+				//If there was some error due calculations return it
+				if (tmp.lst.back().state == 4) return tmp.lst.back();
+				//Insert to the end general list of iterators
+				//auxiliary list of iterators
+				genLst.insert(genLst.end(), auxLst.begin(), auxLst.end());
+				//Clear auxiliary lists
+				auxLst.clear(); auxS.lst.clear();
+			}
+			//Case of summing or subracting complex values outside braces
+			else if (!brace && !simF && !simS) {
+				//If Auxiliary list is empty break this statement
+				if (auxS.lst.empty()) continue ;
+
+				//If result list is not empty check
+				//operation sign
+				if (!res.lst.empty()) interSign = finSign(interSign, signF, signS);
+				//Calculate temporary value
+				tmp = ComplexRegEqAnalyzerSumSub(interSign, tmp, auxS);
+				//If there was some error due calculation, return it
+				if (tmp.state == 4) return tmp;
+				//Insert to the end general list of iterators
+				//auxiliary list of iterators
+				genLst.insert(genLst.end(), auxLst.begin(), auxLst.end());
+				//Clear auxiliary lists
+				auxLst.clear(); auxS.lst.clear();
+			}
+			//Insert to the end result list temporary value list
+			res.lst.insert(res.lst.end(), tmp.lst.begin(), tmp.lst.end());
+			//Clear first auxiliary value
+			auxF.lst.clear();
+		}
+	}
+}
+
+//Complex reg values values analizer for summing and subtraction
+MatrixCalc::value MatrixCalc::ComplexRegEqAnalyzerSumSub(const std::string &oper, const value &f, const value &s) {
+	//Number values for computations for both values
+	value numF, numS;
+	//Comparison beginning iterators for both values
+	auto itF = f.lst.begin(), itS = s.lst.begin();
+	//result value
+	value res;
+
+	//If first element is simple regular equation
+	//assign it to 'numF' value and increment itF
+	//for further comparisons
+	if (itF->state == 2) numF = *(itF++);
+	//Else we just 'numF' value as '1'
+	else numF = value(2, "1");
+
+	//The same algorithm for second complex value
+	if (itS->state == 2) numS = *(itS++);
+	else numS = value(2, "1");
+
+
+	//Compare contents of 'f' value of the range [itF, f.lst.end)
+	//to contents of 's' value of the range [itS, s.lst.end)
+	//If they are not equal return empty value, with regular
+	//expression state
+	if (std::list<value>(itF, f.lst.end()) == std::list<value>(itS, s.lst.end())) {
+		res.state = 2; return res;
+	}
+	//In other cases let's calculate 'numF' and 'numS' values
+	//with common postfix (no matter [itF, f.lst.end) or [itS, s.lst.end))
+	res.lst.push_back(Execute(oper, numF, numS));
+	//If there was some error due calculations, return it
+	if (res.lst.back().state == 4) return res.lst.back();
+	//If result of computation is zero return it
+	if (res.lst.back().eq == "0") return res.lst.back();
+	//In other cases insert to the end of the list
+	//common part of both equations
+	res.lst.insert(res.lst.end(), itF, f.lst.end());
+	//set result state as regular equation ('2') and return it
+	res.state = 2;
+	return res;
+}
+
+MatrixCalc::value MatrixCalc::IterateOverSecValueSumSub(const std::string &oper,
+														const value &f, const value &s,
+														const bool &signF, const bool &simF) {
+	//Temporary value
+			value tmp;
+			//insert to result list auxiliary value list
+			tmp.lst.insert(tmp.lst.end(), auxF.lst.begin(), auxF.lst.end());
+			//clear first auxiliary list
+			for (auto itS = s.lst.begin(); itS != s.lst.end(); ++itS) {
+				//Assign interim operation to base ('oper') intially
+				interSign = oper;
+				//If element was found in general iterator list
+				//proceed to next iteration, thus it was computed
+				//already
+				if (auto s = std::find(genLst.begin(), genLst.end(), itS); s != genLst.end())
+					continue ;
+				//In case of open brace increment brace variable
+				//and set 'simS' as false
+				if (itS->state == 5 && itS->eq == "(") { ++brace, simS = false; }
+				//In case of close brace decrement brace variable
+				//and set 'simS' as false
+				else if (itS->state == 5 && itS->eq == ")") { --brace, simS = false; }
+				//In case of operation statement and not sum or subtract
+				//set simF as false, thus it's not simple equation
+				else if (!itF->state && itF->eq != "+" && itF->eq != "-")
+					simS = false;
+				//Case of summing or subtracting simple values outside braces
+				else if (!itF->state && (itS->eq == "+" || itS->eq == "-") && !brace
+						 && simF && simS) {
+					//If Auxiliary list is empty proceed iterations
+					if (auxS.lst.empty()) continue ;
+
+					//If result list is not empty check
+					//operation sign
+					if (!res.lst.empty()) interSign = finSign(interSign, signF, signS);
+					//Execute equation, and if there is error, return it
+					tmp.lst.back() = Execute(interSign, tmp.lst.back(), auxS.lst.back());
+					//If there was some error due calculations return it
+					if (tmp.lst.back().state == 4) return tmp.lst.back();
+					//Insert to the end general list of iterators
+					//auxiliary list of iterators
+					genLst.insert(genLst.end(), auxLst.begin(), auxLst.end());
+					//Clear auxiliary lists
+					auxLst.clear(); auxS.lst.clear();
+					//Proceed to next iteration
+					continue ;
+				}
+				//Case of summing or subracting complex values outside braces
+				else if (!itF->state && (itS->eq == "+" || itS->eq == "-")
+						 && !simF && !simS && !brace) {
+					//If Auxiliary list is empty proceed iterations
+					if (auxS.lst.empty()) continue ;
+
+					//If result list is not empty check
+					//operation sign
+					if (!res.lst.empty()) interSign = finSign(interSign, signF, signS);
+					//Calculate temporary value
+					tmp = ComplexRegEqAnalyzerSumSub(interSign, tmp, auxS);
+					//If there was some error due calculation, return it
+					if (tmp.state == 4) return tmp;
+					//Insert to the end general list of iterators
+					//auxiliary list of iterators
+					genLst.insert(genLst.end(), auxLst.begin(), auxLst.end());
+					//Clear auxiliary lists
+					auxLst.clear(); auxS.lst.clear();
+					//Proceed to next iteration
+					continue ;
+				}
+				//Push iterator to iterator auxiliary list of second value list
+				auxLst.push_back(itS);
+				//Push values to auxiliary value list of second value list
+				auxS.lst.push_back(*itS);
+			}
+			//Case of summing or subtracting simple values outside braces
+			if (!brace && simF && simS) {
+				//If Auxiliary list is empty break this statement
+				if (auxS.lst.empty()) break ;
+
+				//If result list is not empty check
+				//operation sign
+				if (!res.lst.empty()) interSign = finSign(interSign, signF, signS);
+				//Execute equation, and if there is error, return it
+				tmp.lst.back() = Execute(interSign, tmp.lst.back(), auxS.lst.back());
+				//If there was some error due calculations return it
+				if (tmp.lst.back().state == 4) return tmp.lst.back();
+				//Insert to the end general list of iterators
+				//auxiliary list of iterators
+				genLst.insert(genLst.end(), auxLst.begin(), auxLst.end());
+				//Clear auxiliary lists
+				auxLst.clear(); auxS.lst.clear();
+			}
+			//Case of summing or subracting complex values outside braces
+			else if (!brace && !simF && !simS) {
+				//If Auxiliary list is empty break this statement
+				if (auxS.lst.empty()) continue ;
+
+				//If result list is not empty check
+				//operation sign
+				if (!res.lst.empty()) interSign = finSign(interSign, signF, signS);
+				//Calculate temporary value
+				tmp = ComplexRegEqAnalyzerSumSub(interSign, tmp, auxS);
+				//If there was some error due calculation, return it
+				if (tmp.state == 4) return tmp;
+				//Insert to the end general list of iterators
+				//auxiliary list of iterators
+				genLst.insert(genLst.end(), auxLst.begin(), auxLst.end());
+				//Clear auxiliary lists
+				auxLst.clear(); auxS.lst.clear();
+			}
 }
 
 //Get error string
