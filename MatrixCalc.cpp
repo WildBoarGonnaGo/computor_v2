@@ -1075,7 +1075,7 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 	}
 	//In case of both values are regular expressions, or
 	//one these values is token, and second is regular expression
-	else if ((first.state == 2 && second.state == 2)
+	/*else if ((first.state == 2 && second.state == 2)
 		|| (first.state == 3 && second.state == 2)
 		|| (first.state == 2 && second.state == 3)) {
 		//Expression calculator, in case of error return it
@@ -1085,6 +1085,12 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		res.eq = pol.CalcIt();
 		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); res.state = 4; }
 		res.state = 2;
+	}*/
+	//In case of both values are regular expressions
+	else if (first.state == 2 && second.state == 2) {
+		//In case of summing or subtraction
+		if (oper == "+" || oper == "-")
+			
 	}
 	//If first variable is matrix and second is token
 	else if (first.state == 1 && second.state == 3) {
@@ -2063,6 +2069,117 @@ MatrixCalc::value MatrixCalc::AnalizeModifyValue(value &&src) {
     //Set final result as matrix and return it
     res.state = 1;
     return res;
+}
+
+MatrixCalc::value MatrixCalc::SumSubRegEq(const std::string &oper, const value &f, const value &s) {
+	//Result value
+	value res;
+
+	//In case the first regular equation is simple and
+	//the second is complex
+	if (f.lst.empty() && !s.lst.empty()) return SumSubSimpleComplexRegEq(oper, f, s);
+	//In case the first regular equation is complex and
+	//the second is simple
+}
+
+//Summing or subracting simple regular equation (f) and
+//complex regular equation (s)
+MatrixCalc::value MatrixCalc::SumSubSimpleComplexRegEq(const std::string &oper, const value &f, const value &s) {
+	//Result value
+	value res;
+	//Sign status
+	bool sign = true;
+	//Is regular value pure
+	bool pure = true;
+	//Brace counter
+	int brace = 0;
+	//Were computations performed
+	bool comp = false;
+	//Is element first?
+	bool first = true;
+	//interim operation
+	std::string intOper;
+	//auxiliary value
+	value aux;
+	//lambda function. Return operation as string
+	auto signStr = [](const std::string &oper, bool sign) {
+		//'-' and '-' gives us summation
+		if (oper == "-" && !sign) return "+";
+		//'-' and '+' gives us subtraction
+		else if (oper == "-" && sign) return "-";
+		//'+' and '-' gives us subtraction
+		else if (oper == "+" && !sign) return "-";
+		//In other cases we have summation
+		else return "+";
+	};
+
+	//Put 'f' value to result list as first
+	res.lst.push_back(f);
+	//Iterate over the complex values
+	for (auto it = s.lst.begin(); it != s.lst.end(); ++it) {
+		//In case of open brace increment brace counter and
+		//set pure as false
+		if (it->state == 5 && it->eq == "(") { ++brace; pure = false; }
+		//In case of close brace decrement brace counter
+		//and set pure as false
+		else if (it->state == 5 && it->eq == ")") { --brace; pure = false; }
+		//In case of non subract or sum operation set pure as false
+		else if (!it->state && it->eq != "+" && it->eq != "-") pure = false;
+		//In case of subraction or summing pure number and non comp state
+		//perform computations
+		else if (!it->state && (it->eq == "+" || it->eq == "-")
+				 && pure && !comp) {
+			//Check sign of interim operation
+			intOper = signStr(oper, sign);
+
+			//Perform calculation between simple equation and
+			//'eq'. If there was error due calculations, return it
+			res.lst.back() = Execute(intOper, res.lst.back(), aux.lst.back());
+			if (res.lst.back().state == 4) return res.lst.back();
+			//If current operation is '-' set 'sign' as false
+			//in other case set it as 'true'
+			sign = (it->eq == "+") ? true : false;
+			//Set computation as performed ("true")
+			comp = true;
+			//clear auxiliary list and continue iterations
+			aux.lst.clear();
+			continue ;
+		}
+		//Case of summing or subtraction non-pure value,
+		//or pure value in case when computation were already
+		//performed
+		else if (!it->state && (it->eq == "+" || it->eq == "-") &&
+				 (!pure || comp)) {
+			intOper = signStr(oper, sign);
+
+			//Push interim operation and complex regular equation
+			res.lst.push_back(value(0, intOper));
+			res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+			//Clear auxiliary list and continue iterations
+			aux.lst.clear();
+			continue ;
+		}
+		aux.lst.push_back(*it);
+	}
+	//Check sign of interim operation
+	intOper = signStr(oper, sign);
+	//In case of pure value and not performed computation
+	if (pure && !comp) {
+		//Perform calculation between simple equation and
+		//'eq'. If there was error due calculations, return it
+		res.lst.back() = Execute(intOper, res.lst.back(), aux.lst.back());
+		if (res.lst.back().state == 4) return res.lst.back();
+	}
+	//In other case just operation and aux list
+	//to the end of result list
+	else {
+		//Push interim operation and complex regular equation
+		res.lst.push_back(value(0, intOper));
+		res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+	}
+	//Set result of value as regular equation and return it
+	res.state = 2;
+	return res;
 }
 
 //Get error string

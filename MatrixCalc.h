@@ -135,6 +135,14 @@ class MatrixCalc {
     value ComplexComplexMatrixMulti(const value &f, const value &s);
     //Analizing and modifying complex source value
     value AnalizeModifyValue(value &&src);
+	//Summing or subracting regular equations
+	value SumSubRegEq(const std::string &oper, const value &f, const value &s);
+	//Summing or subracting simple regular equation and
+	//complex regular equation
+	value SumSubSimpleComplexRegEq(const std::string &oper, const value &f, const value &s);
+	//Summing or subtracting complex regular equation and
+	//simple regular equation
+	value SumSubComplexSimpleRegEq(const std::string &oper, const value &f, const value &s);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
