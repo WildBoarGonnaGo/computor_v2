@@ -2816,7 +2816,7 @@ MatrixCalc::value MatrixCalc::MultiDivBothComplexRegEq(std::string &oper, const 
 		res.state = true;
 		return res;
 	}
-	//
+	//In other cases set
 }
 
 
@@ -2877,11 +2877,11 @@ MatrixCalc::value MatrixCalc::AnalyzeForMultiDiv(const value &src, value &m, val
 
 //Equation simplifier and analyzer for source value
 //Something like bubble sort
-MatrixCalc::value MatrixCalc::EqAnalizeSimplify(value &&src) {
+MatrixCalc::value MatrixCalc::EqAnalyzeSimplify(value &&src) {
 	//result value
 	value res;
 	//Set of norm functions
-	std::set<std::string> setNormFunc = { "lonenorm", "lpnorm", "ltwonorm", "linfnorm" };
+	std::set<std::string> setNormFunc = { "lonenorm", "lpnorm", "ltwonorm", "linfnorm", "det" };
 	//brace counter
 	int brace = 0;
 	//state of reviewd function due iteration
@@ -2890,7 +2890,6 @@ MatrixCalc::value MatrixCalc::EqAnalizeSimplify(value &&src) {
 	int state = 2;
 	//auxiliary value
 	value aux;
-	//
 
 	//Iterate over source value lst with buble sort iteration
 	for (auto it = src.lst.begin(); it != src.lst.end(); ) {
@@ -2908,73 +2907,280 @@ MatrixCalc::value MatrixCalc::EqAnalizeSimplify(value &&src) {
 		if (!it->state && (it->eq == "*" || it->eq == "/") && !brace) {
 			//In case of norm function let's iterate over next
 			//values
-			if (state == 2) {
-				//auxiliary iterator
-				auto auxIt = it;
-				//'Does value fit' statement, by default it's true
-				bool fit = true;
-				//Last operation iterator
-				auto opIt = it;
-				//power raise, multiplier and primary part of primary
-				//auxiliary value. Let's assign them
-				value pF, mF, primF;
-				primF = AnalyzeForMultiDiv(aux, mF, pF, state);
-				//Second auxiliary value
-				value auxS;
-				//Let's iterate over next values
-				for (++auxIt; auxIt != src.lst.end(); ++auxIt) {
-					//In case of open brace increment brace counter
-					if (auxIt->state == 5 && auxIt->eq == "(") ++brace;
-					//In case of close brace decrement brace counter
-					else if (auxIt->state == 5 && auxIt->eq == ")") --brace;
-					//In case non multiplication or division operation
-					//Let's compare function names of auxiliary value
-					//and currently iterated function outside brace.
-					//If they're not equal, set 'fit' as false
-					if (!auxIt->state && !brace && auxIt->eq != "*" && auxIt->eq != "/"
-						&& aux.lst.front().eq == auxIt->eq) fit = true;
-					//In other cases set it as false
-					else if (!auxIt->state && !brace && auxIt->eq != "*" && auxIt->eq != "/"
-							 && aux.lst.front().eq != auxIt->eq) fit = false;
-					//In case of multiplication or division outside braces
-					//Let's compare second auxiliary value with primary
-					else if (!it->state && !brace
-							 && (auxIt->eq == "*" || auxIt->eq == "/")) {
-						//If previous setup of auxiliary values doesn't fit
-						//clear second auxiliary value and proceed to next
-						//iteration
-						if (!fit) { auxS.lst.clear(); continue ; }
-						//In other cases compare them, at first set
-						//power raise, multiplier and primary part of secondary
-						//auxiliary value. Let's assign them
-						value pS, mS, primS;
-						primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
-						//If base parts are equal, calculate them
-						if (primF.lst == primS.lst) {
-							//Calculate multiplier, and in case of error,
-							//return it
-							mF = Execute(opIt->eq, mF, mS);
-							if (mF.state == 4) return mF;
-							//If result of operation is zero, set auxF as
-							//zero, save current operation and proceed to next iteration
-							if (mF.eq == "0") {
-								aux = value(2, "0");
-								opIt = auxIt;
-								continue ;
-							}
-							//Calculate raise power value, and in case
-							//of error return it
-							pF = Execute((opIt->eq == "*") ? "+" : "-", pF, pS);
-							if (pF.state == 4) return pF;
-							//If result of operation equal to zero
-						}
-					}
-				}
-
-			}
-		}
-
+			if (state == 2)
+                aux = RegEqAnalyzeSimplifySecondIt(src, it, state, aux);
+            //In case of matrix function iterate until next value
+            //is equal to previous
+            if (state == 1)
+                aux = MatrixAnalyzeSimplifySecondIt(src, it, state, aux);
+            //If there was error due calculations, return it
+            if (aux.state == 4) return aux;
+            //If computation result is simple regular equation
+            //push it to the end of result list
+            else if (aux.lst.empty() && !aux.eq.empty()) res.lst.push_back(aux);
+            //In other cases append result of the auxiliary list to the end of result list
+            else if (!aux.lst.empty()) res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+            //Clear auxiliary list and proceed to next iteration
+            aux.lst.clear();
+            aux.eq.clear();
+            continue ;
+        }
+        aux.lst.push_back(*it);
 	}
+    //Set state for result and return it
+    res.state = src.state;
+    return res;
+}
+
+//regular equation analyzer and simplifier for
+//source value second iteration
+MatrixCalc::value MatrixCalc::RegEqAnalyzeSimplifySecondIt(value &src, std::list<value>::iterator &it,
+                                                           const int &state, const value &aux) {
+    //auxiliary iterator
+    auto auxIt = it;
+    //'Does value fit' statement, by default it's true
+    bool fit = true;
+    //Last operation iterator
+    auto opIt = it;
+    //brace counter
+    int brace = 0;
+    //Auxiliary value for second iteration
+    value auxS;
+    //power raise, multiplier and primary part of primary
+    //auxiliary value. Let's assign them
+    value pF, mF, primF;
+    primF = AnalyzeForMultiDiv(aux, mF, pF, state);
+    //result value. Assign it to auxiliary parameter
+    value res = aux;
+    
+    //Let's iterate over next values
+    for (++auxIt; auxIt != src.lst.end(); ++auxIt) {
+        //In case of open brace increment brace counter
+        if (auxIt->state == 5 && auxIt->eq == "(") ++brace;
+        //In case of close brace decrement brace counter
+        else if (auxIt->state == 5 && auxIt->eq == ")") --brace;
+        //In case non multiplication or division operation
+        //Let's compare function names of auxiliary value
+        //and currently iterated function outside brace.
+        //If they're not equal, set 'fit' as false
+        if (!auxIt->state && !brace && auxIt->eq != "*" && auxIt->eq != "/"
+            && res.lst.front().eq == auxIt->eq) fit = true;
+        //In other cases set it as false
+        else if (!auxIt->state && !brace && auxIt->eq != "*" && auxIt->eq != "/"
+                 && auxIt->eq != "^" && res.lst.front().eq != auxIt->eq) fit = false;
+        //In case of multiplication or division outside braces
+        //Let's compare second auxiliary value with primary
+        else if (!it->state && !brace
+                 && (auxIt->eq == "*" || auxIt->eq == "/")) {
+            //In case of aux simple regular value
+            if (res.lst.empty() && res.state == 2 && !res.eq.empty()) {
+                res = MultiDivRegEq(opIt->eq, res, auxS);
+                //clear assign current operation iterator to 'opIt'
+                opIt = auxIt;
+                //clear secondary auxiliary list and proceed
+                //to next iteration
+                auxS.lst.clear();
+                continue ;
+            }
+            //If previous setup of auxiliary values doesn't fit
+            //clear second auxiliary value and proceed to next
+            //iteration
+            if (!fit) { auxS.lst.clear(); continue ; }
+            //In other cases compare them, at first set
+            //power raise, multiplier and primary part of secondary
+            //auxiliary value. Let's assign them
+            value pS, mS, primS;
+            primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
+            //If base parts are equal, calculate them
+            if (primF.lst == primS.lst) {
+                //Clear result list
+                res.lst.clear();
+                //Clear secondary auxiliary list
+                auxS.lst.clear();
+                //Erase iterators from opIt to current, thus there's
+                //no need of them
+                it = src.lst.erase(opIt, auxIt);
+                //Calculate multiplier, and in case of error,
+                //return it
+                mF = Execute(opIt->eq, mF, mS);
+                if (mF.state == 4) return mF;
+                //Calculate raise power value, and in case
+                //of error return it
+                pF = Execute((opIt->eq == "*") ? "+" : "-", pF, pS);
+                if (pF.state == 4) return pF;
+                //If result of operation is zero, set result as 0
+                if (mF.eq == "0") res = value(2, "0");
+                //If result of operation equal to zero, set result
+                //as 'mF' value
+                else if (pF.eq == "0") res = mF;
+                //In other cases generate new auxiliary value as initializer
+                //list
+                else {
+                    //If 'mF' is not '1' digit, insert 'mF' value
+                    //and multiplication operation to the end or result value
+                    if (mF.eq != "1") res.lst.insert(res.lst.end(), { mF, value(0, "*") } );
+                    //Insert primary part to the end of the list
+                    res.lst.push_back(primF);
+                    //If 'pF' is not '1' digit, insert power raising operation
+                    //and 'pF' value
+                    if (pF.eq != "1") res.lst.insert(res.lst.end(), { value(0, "^"), pF });
+                }
+            }
+            //save current operation and proceed to next iteration
+            opIt = auxIt;
+            //reset fit statement
+            fit = true;
+            //clear secondary auxiliary list and proceed to next iteration
+            auxS.lst.clear();
+            continue ;
+        }
+        auxS.lst.push_back(*auxIt);
+    }
+    //Set result statement as regular equation
+    res.state = state;
+    //In case of aux simple regular value
+    if (res.lst.empty() && res.state == 2 && !res.eq.empty())
+        return MultiDivRegEq(opIt->eq, res, auxS);
+    //If previous setup of auxiliary values doesn't fit
+    //just return result
+    if (!fit) return res;
+    //In other cases compare them, at first set
+    //power raise, multiplier and primary part of secondary
+    //auxiliary value. Let's assign them
+    value pS, mS, primS;
+    primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
+    //If base parts are equal, calculate them
+    if (primF.lst == primS.lst) {
+        //Clear result list
+        res.lst.clear();
+        //Clear secondary auxiliary list
+        auxS.lst.clear();
+        //Erase iterators from opIt to current, thus there's
+        //no need of them
+        it = src.lst.erase(opIt, auxIt);
+        //Calculate multiplier, and in case of error,
+        //return it
+        mF = Execute(opIt->eq, mF, mS);
+        if (mF.state == 4) return mF;
+        //Calculate raise power value, and in case
+        //of error return it
+        pF = Execute((opIt->eq == "*") ? "+" : "-", pF, pS);
+        if (pF.state == 4) return pF;
+        //If result of operation is zero, set result as 0
+        if (mF.eq == "0") res = value(2, "0");
+        //If result of operation equal to zero, set result
+        //as 'mF' value
+        else if (pF.eq == "0") res = mF;
+        //In other cases generate new auxiliary value as initializer
+        //list
+        else {
+            //If 'mF' is not '1' digit, insert 'mF' value
+            //and multiplication operation to the end or result value
+            if (mF.eq != "1") res.lst.insert(res.lst.end(), { mF, value(0, "*") } );
+            //Insert primary part to the end of the list
+            res.lst.push_back(primF);
+            //If 'pF' is not '1' digit, insert power raising operation
+            //and 'pF' value
+            if (pF.eq != "1") res.lst.insert(res.lst.end(), { value(0, "^"), pF });
+        }
+    }
+    //Return result
+    return res;
+}
+
+//Matrix analyzer and simplifier for source value second
+//iteration
+MatrixCalc::value MatrixCalc::MatrixAnalyzeSimplifySecondIt(value &src, std::list<value>::iterator &it,
+                                    const int &state, const value &aux) {
+    //result value. Initially set it as auxiliary value
+    value res = aux;
+    //Secondary iterator
+    auto auxIt = it;
+    //operation iterator
+    auto opIt = it;
+    //brace counter
+    int brace = 0;
+    //Secondary auxiliary value
+    value auxS;
+    //power raise, multiplier and primary part of primary
+    //auxiliary value. Let's assign them
+    value pF, mF, primF;
+    primF = AnalyzeForMultiDiv(aux, mF, pF, state);
+    
+    for (++auxIt; auxIt != src.lst.end(); ++auxIt) {
+        //In case of open brace increment brace counter
+        if (auxIt->state == 5 && auxIt->eq == "(") ++brace;
+        //In case of close brace decrement brace counter
+        else if (auxIt->state == 5 && auxIt->eq == ")") --brace;
+        //In case of not fitting function outside braces return result
+        else if (!auxIt->state && auxIt->eq != "*" && auxIt->eq != "/" && auxIt->eq != "^"
+                 && auxIt->eq != res.lst.front().eq && !brace) return res;
+        //In case of token, or regular equation outside braces return result
+        else if ((auxIt->state == 3 || auxIt->state == 2) && !brace) return res;
+        //In case multiplication outside braces
+        else if (!auxIt->state && (auxIt->eq == "*" || auxIt->eq == "/") && !brace) {
+            //In other cases compare them, at first set
+            //power raise, multiplier and primary part of secondary
+            //auxiliary value. Let's assign them
+            value pS, mS, primS;
+            primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
+            //If base parts are equal, calculate them
+            if (primF.lst == primS.lst) {
+                //Erase computated values from source list
+                //so they are already used in calculations
+                it = src.lst.erase(opIt, auxIt);
+                //Calculate multiplier, and in case of error,
+                //return it
+                mF = Execute("*", mF, mS);
+                if (mF.state == 4) return mF;
+                //Calculate power raising value
+                pF = Execute("*", mF, mS);
+                if (pF.state == 4) return pF;
+                //Generate result by initializer list
+                res.lst = { mF, value(0, "*"), primF, value(0, "^"), pF };
+                //If operation is divison, return result
+                if (auxIt->eq == "/") return res;
+                //Else set assign current iterator to
+                //current iterator
+                opIt = auxIt;
+            }
+            //Else return result
+            else return res;
+            //clear secondary auxiliary list
+            //and proceed to next iteration
+            auxS.lst.clear();
+            continue;
+        }
+        auxS.lst.push_back(*auxIt);
+        //In other cases compare them, at first set
+        //power raise, multiplier and primary part of secondary
+        //auxiliary value. Let's assign them
+        value pS, mS, primS;
+        primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
+        //If base parts are equal, calculate them
+        if (primF.lst == primS.lst) {
+            //Erase computated values from source list
+            //so they are already used in calculations
+            it = src.lst.erase(opIt, auxIt);
+            //Calculate multiplier, and in case of error,
+            //return it
+            mF = Execute("*", mF, mS);
+            if (mF.state == 4) return mF;
+            //Calculate power raising value
+            pF = Execute("*", mF, mS);
+            if (pF.state == 4) return pF;
+            //Generate result by initializer list
+            res.lst = { mF, value(0, "*"), primF, value(0, "^"), pF };
+            //If operation is divison, return result
+            if (auxIt->eq == "/") return res;
+            //Else set assign current iterator to
+            //current iterator
+            opIt = auxIt;
+        }
+        //Set result state and return it
+        res.state = state;
+        return res;
+    }
 }
 
 //Get error string

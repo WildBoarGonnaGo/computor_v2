@@ -173,7 +173,15 @@ class MatrixCalc {
 	//Analyze element of regular equation for multiplications or division
 	value AnalyzeForMultiDiv(const value &src, value &m, value &p, const int &state);
 	//Equation simplifier and analyzer for source value
-	value EqAnalizeSimplify(value &&src);
+	value EqAnalyzeSimplify(value &&src);
+    //regular equation analyzer and simplifier for
+    //source value second iteration
+    value RegEqAnalyzeSimplifySecondIt(value &src, std::list<value>::iterator &it,
+                                       const int &state, const value &aux);
+    //Matrix analyzer and simplifier for source value second
+    //iteration
+    value MatrixAnalyzeSimplifySecondIt(value &src, std::list<value>::iterator &it,
+                                        const int &state, const value &aux);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
