@@ -148,8 +148,32 @@ class MatrixCalc {
 	//Complex reg values values analizer for summing and subtraction
 	value ComplexRegEqAnalyzerSumSub(const std::string &oper, const value &f, const value &s);
 	//Iterate over the second value for summing and subtraction
-	value IterateOverSecValueSumSub(const std::string &oper, const value &f, const value &s,
-									const bool &signF, const bool &simF);
+	value IterateOverSecValueSumSub(const std::string &oper, const value &auxF, const value &s,
+									const bool &signF, const bool &simF,
+									std::list<std::list<value>::const_iterator> &auxLst,
+									std::list<std::list<value>::const_iterator> &genLst,
+									const value &res);
+	//Check value if it has zero values
+	void CheckZero(value &src);
+	//Iterate second value components to
+	//generate final complex expression
+	void IterateOverSecValueFinGen(value &res,
+								   const std::list<std::list<value>::const_iterator> &genLst,
+								   const std::string &oper, const value &s);
+	//Multiplication of dividing regular equations
+	value MultiDivRegEq(const std::string &oper, const value &f, const value &s);
+	//Multiplicatoin and Division of simple regular equation and complex regular equation
+	value MultiDivSimpleComplexRegEq(const std::string &oper, const value &f, const value &s);
+	//Does complex value have multiple elements (with summing or subtraction operations)
+	bool DoesComplexValHaveMultiple(const value &f);
+	//Case of division simple value by complex value (both values are regular equations)
+	value DivisionSimpleByComplexRegEq(const value &f, const value &s);
+	//Case of multiplication or division of complex regular equations
+	value MultiDivBothComplexRegEq(std::string &oper, const value &f, const value &s);
+	//Analyze element of regular equation for multiplications or division
+	value AnalyzeForMultiDiv(const value &src, value &m, value &p, const int &state);
+	//Equation simplifier and analyzer for source value
+	value EqAnalizeSimplify(value &&src);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
