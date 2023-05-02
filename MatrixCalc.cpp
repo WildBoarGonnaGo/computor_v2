@@ -3134,7 +3134,7 @@ MatrixCalc::value MatrixCalc::MatrixAnalyzeSimplifySecondIt(value &src, std::lis
                 mF = Execute("*", mF, mS);
                 if (mF.state == 4) return mF;
                 //Calculate power raising value
-                pF = Execute("*", mF, mS);
+                pF = Execute("+", pF, pS);
                 if (pF.state == 4) return pF;
                 //Generate result by initializer list
                 res.lst = { mF, value(0, "*"), primF, value(0, "^"), pF };
