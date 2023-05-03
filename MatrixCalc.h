@@ -170,6 +170,9 @@ class MatrixCalc {
 	value DivisionSimpleByComplexRegEq(const value &f, const value &s);
 	//Case of multiplication or division of complex regular equations
 	value MultiDivBothComplexRegEq(std::string &oper, const value &f, const value &s);
+	//Multiplication or Division of complex regular equation with multiple elements and complex
+	//regular equation with one element
+	value MultiDivComplexRegEqs(std::string &oper, const value &f, const value &s);
 	//Analyze element of regular equation for multiplications or division
 	value AnalyzeForMultiDiv(const value &src, value &m, value &p, const int &state);
 	//Equation simplifier and analyzer for source value

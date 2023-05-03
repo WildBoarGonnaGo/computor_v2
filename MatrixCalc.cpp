@@ -2795,31 +2795,19 @@ MatrixCalc::value MatrixCalc::MultiDivBothComplexRegEq(std::string &oper, const 
 	//for both values
 	bool mF = DoesComplexValHaveMultiple(f), mS = DoesComplexValHaveMultiple(s);
 
-	//If at least one of the values has multiple elements
-	//generate new value without any computations
-	if (mF || mS) {
-		//If 'mF' is true, add braces for the first value
-		if (mF) res.lst.push_back(value(5, "("));
-		//Insert first elements values to the end of the
-		//result list
-		res.lst.insert(res.lst.end(), f.lst.begin(), f.lst.end());
-		if (mF) res.lst.push_back(value(5, ")"));
-		//Add operation value (based on 'oper' value)
-		res.lst.push_back(value(0, oper));
-		//If 'mS' is true, add braces for the first value
-		if (mS) res.lst.push_back(value(5, "("));
-		//Insert first elements values to the end of the
-		//result list
-		res.lst.insert(res.lst.end(), s.lst.begin(), s.lst.end());
-		if (mS) res.lst.push_back(value(5, ")"));
-		//Set state as regular equation and return it
-		res.state = true;
-		return res;
+	//In case of one element has multiple elements and other is not
+	if ((mF && !mS) || (!mF && mS)) {
+		
 	}
 	//In other cases set
 }
 
+//Multiplication or Division of complex regular equation with multiple elements and complex
+//regular equation with one element
+MatrixCalc::value MatrixCalc::MultiDivComplexRegEqs(std::string &oper,
+													const value &f, const value &s) {
 
+}
 
 //Analyze element for multiplications or division
 MatrixCalc::value MatrixCalc::AnalyzeForMultiDiv(const value &src, value &m, value &p,
