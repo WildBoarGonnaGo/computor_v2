@@ -96,6 +96,28 @@ class MatrixCalc {
 	value funcExprExec(const std::string &oper, std::stack<value> &nums);
 	//Execute some base operands between two values
 	value Execute(const std::string &oper, const value &first, const value &second);
+    //Process token and regular equation
+    value ProcessTokenAndRegEq(const std::string &oper, const value &reg, const value &tokenVal);
+    //Summing and subraction of regular equation and token
+    value SumSubRegEqToken(const std::string &oper, const value &reg, const value &tokenVal,
+                           const bool &isTokenFirst);
+    //Complex summing or subtraction complex regular equation and token
+    value SumSubComplexRegEqToken(const std::string &oper, const value &reg, const value &tokenVal,
+                                  const bool &isTokenFirst);
+    //Submethod for summing or subtraction regular equation and token, in case of token
+    //is first value
+    void SumSubComplexRegEqFirstToken(const std::string &oper, value &res, value &aux, bool &sign,
+                                       bool &comp, bool &isToken);
+    //Submethod for summing or subtraction regular equation and token, in case of token
+    //is not first value
+    void SumSubComplexRegEqIsNotFirstToken(const std::string &oper, value &res, value &aux, bool &sign,
+                                       bool &comp, bool &isToken, const value &tokenVal);
+    //Computating both regular expression value
+    value ProcessBothRegEq(const std::string &oper, const value &f, const value &s);
+    //Computating first matrix variable and second token variable
+    value ProcessMatrixAndToken(const std::string &oper, const value &f, const value &s);
+    //Computating first token variable and second matrix variable
+    value ProcessTokenAndMatrix(const std::string &oper, const value &f, const value &s);
 	//Matricies summing and subtraction
 	value MatriciesSumSub(const std::string &oper, const value &first, const value &second);
 	//Matrix elements multiply results for socket
@@ -187,7 +209,11 @@ class MatrixCalc {
     value MatrixAnalyzeSimplifySecondIt(value &src, std::list<value>::iterator &it,
                                         const int &state, const value &aux);
 	//Regular equation power raising
-	value PowRaiseRegEq(const value &f, const value &s);
+    value PowRaiseRegEq(const value &f, const value &s);
+    //Multiplication of complex regular expression and simple matrix
+    value MultiComplexRegEqSimpleMatrix(const value &r, const value &m);
+    //Mutliplication of complex regular expression and complex matrix
+    value MultiComplexRegEqComplexMatrix(const value &r, const value &m);
 public:
 	//Default constructor
 	MatrixCalc() = delete;

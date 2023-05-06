@@ -1087,9 +1087,13 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); res.state = 4; }
 		res.state = 2;
 	}*/
+    //In case of one value is token and other is regular expression
+    else if ((first.state == 3 && second.state == 2) || (first.state == 2 && second.state == 3)) {
+        
+    }
 	//In case of both values are regular expressions
 	else if (first.state == 2 && second.state == 2) {
-		//In case of summing or subtraction
+		/*//In case of summing or subtraction
 		if (oper == "+" || oper == "-")
 			res = SumSubRegEq(oper, first, second);
 		//In case of multiplication or division
@@ -1097,11 +1101,12 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 			res = MultiDivRegEq(oper, first, second);
 		//In case of power raising
 		else
-			res = PowRaiseRegEq(first, second);
+			res = PowRaiseRegEq(first, second);*/
+        return ProcessBothRegEq(oper, first, second);
 	}
 	//If first variable is matrix and second is token
 	else if (first.state == 1 && second.state == 3) {
-		//In case of matrix and token multiplication
+		/*//In case of matrix and token multiplication
 		if (oper == "*")
 			res = MultiTokenMatrix(first, second);
 		//In case of matrix and token division
@@ -1127,11 +1132,12 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 		}
 		//In other cases just add operator
 		else
-			res = AddOperTokenMatrix(oper, first, second);
+			res = AddOperTokenMatrix(oper, first, second);*/
+        res = ProcessMatrixAndToken(oper, first, second);
 	}
 	//If first variable is token and second is matrix
 	else if (first.state == 3 && second.state == 1) {
-		//In case of token and matrix multiplication
+		/*//In case of token and matrix multiplication
 		if (oper == "*")
 			res = MultiTokenMatrix(first, second);
 		//In case of division return error
@@ -1147,9 +1153,295 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 			res.state = 4;
 		}
 		//In other cases just add the operation
-		else res = AddOperTokenMatrix(oper, first, second);
+		else res = AddOperTokenMatrix(oper, first, second);*/
+        res = ProcessTokenAndMatrix(oper, first, second);
 	}
 	return res;
+}
+
+//Process token and regular equation
+MatrixCalc::value MatrixCalc::ProcessTokenAndRegEq(const std::string &oper, const value &f, const value &s) {
+    //Result value
+    value res;
+    //Token and matrix values
+    value token = (f.state == 3) ? f : s,
+    reg = (f.state == 3) ? s : f;
+    
+    
+    //In case of summing or subtraction
+    if (oper == "+" || oper == "-")
+        return SumSubRegEqToken(oper, reg, token, f.state == 3);
+    //In case of multiplication or division
+    else if (oper == "*" || oper == "/") {
+        
+    }
+}
+
+//Summing and subraction of regular equation and token
+MatrixCalc::value MatrixCalc::SumSubRegEqToken(const std::string &oper, const value &reg, const value &tokenVal,
+                                               const bool &isTokenFirst) {
+    //Result value
+    value res;
+    
+    //If regular expression is complex
+    if (!reg.lst.empty())
+            return SumSubComplexRegEqToken(oper, reg, tokenVal, isTokenFirst);
+    //Expression calculator
+    RevPolNotation pol(funcs);
+    //Expression string
+    std::string expr;
+    
+    //In case of first value is token, generate next expression
+    if (isTokenFirst)
+        expr = "(" + tokenVal.eq + ") " + oper + " (" + reg.eq + ")";
+    //In case of token is second value, generate next expression
+    else
+        expr = "(" + reg.eq + ") " + oper + " (" + tokenVal.eq + ")";
+    //Let's preset the result state as an error
+    res.state = 4;
+    //Let's calculate expression and if some error occured, return it
+    pol.setInfixExpr(std::move(expr));
+    if (!pol.getErrMsg().empty()) return res;
+    expr = pol.CalcIt();
+    if (!pol.getErrMsg().empty()) return res;
+    //Set state as regular equation, and assign expression
+    //result to result string ('res.eq')
+    res.state = 1;
+    res.eq = expr;
+    return res;
+}
+
+//Complex summing or subtraction complex regular equation and token
+MatrixCalc::value MatrixCalc::SumSubComplexRegEqToken(const std::string &oper, const value &reg, const value &tokenVal,
+                                                      const bool &isTokenFirst) {
+    //Result value
+    value res;
+    //Brace counter;
+    int brace = 0;
+    //'Is element is token' statement
+    //By default it's true
+    bool isToken = true;
+    //'Were token computations performed' statement
+    //By default it's false
+    bool comp = false;
+    //'Previous operation' statement. true - it's sum ('+'), false - subtraction ('-')
+    //By default it's true
+    bool sign = true;
+    //auxiliary value
+    value aux;
+    
+    //If token is first variable let's insert it to the end of result list
+    if (isTokenFirst) res.lst.push_back(tokenVal);
+    //Iterate over regular expression value
+    for (auto it = res.lst.begin(); it != res.lst.end(); ++it) {
+        //In case of open brace increment brace counter
+        //and set 'isToken' as false
+        if (it->state == 5 && it->eq == "(") { ++brace; isToken = false; }
+        //In case of close brace decrement brace counter
+        //and set 'isToken' as false
+        else if (it->state == 5 && it->eq == ")") { --brace; isToken = false; }
+        //In case of outer brace non-base-operation element and non token value
+        //set isToken as false
+        else if (auto s = baseOpers.find(it->eq); ((!it->state && s == std::string::npos) || it->state != 3) && !brace)
+            isToken = false;
+        //In case of outer brace summing or subtraction and first value is token
+        else if (!it->state && (it->eq == "+" || it->eq == "-") && !brace && isTokenFirst) {
+            SumSubComplexRegEqFirstToken(oper, res, aux, sign, comp, isToken);
+            //If some error occured, due calculations, return it
+            if (res.state == 4) return res;
+            //Fix current operation in 'sign' statement
+            sign = (it->eq == "-") ? false : true;
+            //Clear auxiliary list and proceed to next iteration
+            aux.lst.clear();
+            continue ;
+        }
+        //In case of outer brace summing or subtraction and first value is not token
+        else if (!it->state && (it->eq == "+" || it->eq == "-") && !brace && !isTokenFirst) {
+            SumSubComplexRegEqIsNotFirstToken(oper, res, aux, sign, comp, isToken, tokenVal);
+            //If some error occured due calculations, return it
+            if (res.lst.back().state == 4) return res.lst.back();
+            //Fix current operation in 'sign' statement
+            sign = (it->eq == "-") ? false : true;
+            //Clear auxiliary list and proceed to next iteration
+            aux.lst.clear();
+            continue ;
+        }
+        aux.lst.clear();
+    }
+    //If token is first element in this equaiton
+    if (isTokenFirst)
+        SumSubComplexRegEqFirstToken(oper, res, aux, sign, comp, isToken);
+    //And in case of first equation element is not token
+    else
+        SumSubComplexRegEqIsNotFirstToken(oper, res, aux, sign, comp, isToken, tokenVal);
+    //If no operation was performed and first value is not token
+    //Append operation value ('oper') and token to the end of result list
+    if (!comp && !isTokenFirst)
+        res.lst.insert(res.lst.end(), { value(0, oper), tokenVal });
+    //Check result for zeros
+    CheckZero(res);
+    //Set state as regular equation and return it
+    res.state = 2;
+    return res;
+}
+
+//Submethod for summing or subtraction regular equation and token, in case of token
+//is first value
+void MatrixCalc::SumSubComplexRegEqFirstToken(const std::string &oper, value &res, value &aux, bool &sign,
+                                                           bool &comp, bool &isToken) {
+    //lambda function. It returns interim operation
+    auto OperChec = [](const std::string &oper, const bool &sign) {
+        //Result operation as string
+        std::string res;
+        
+        //If 'prev' sign of matrix is '-' and initially we perform summation
+        //('+') interim operation is '-'
+        if (oper == "+" && !sign) res = "-";
+        //If 'prev' sign of matrix is '-' and initially we perform subtraction
+        //('-') interim operation is '+'
+        else if (oper == "-" && !sign) res = "+";
+        //In other cases interim operation is equal to
+        //initial operation (declared in 'oper' value)
+        else res = oper;
+        return res;
+    };
+    //Interim operation
+    std::string intSign;
+    
+    //Set operation to perform
+    intSign = OperChec(oper, sign);
+    
+    //In case of non-token value or already performed computations
+    //assign to the end of result value list auxiliary list
+    if (!isToken || comp) {
+        //Push interim operation value
+        res.lst.push_back(value(0, intSign));
+        res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+    }
+    //In other cases execute operations between token
+    //and computations as performed
+    else {
+        res.lst.back() = Execute(intSign, res.lst.back(), aux.lst.back());
+        comp = true;
+    }
+}
+
+void MatrixCalc::SumSubComplexRegEqIsNotFirstToken(const std::string &oper, value &res, value &aux, bool &sign,
+                                                   bool &comp, bool &isToken, const value &tokenVal) {
+    //lambda function. It returns interim operation
+    auto OperChec = [](const std::string &oper, const bool &sign) {
+        //Result operation as string
+        std::string res;
+        
+        //If 'prev' sign of matrix is '-' and initially we perform summation
+        //('+') interim operation is '-'
+        if (oper == "+" && !sign) res = "-";
+        //If 'prev' sign of matrix is '-' and initially we perform subtraction
+        //('-') interim operation is '+'
+        else if (oper == "-" && !sign) res = "+";
+        //In other cases interim operation is equal to
+        //initial operation (declared in 'oper' value)
+        else res = oper;
+        return res;
+    };
+    //Interim operation
+    std::string intSign;
+    
+    //Set operation to perform
+    intSign = OperChec(oper, sign);
+    
+    //In case of non-token value or already performed computations
+    //assign to the end of result value list auxiliary list
+    if (!isToken || comp) {
+        //Push operation value if it's not the first component
+        if (!res.lst.empty()) res.lst.push_back(value(0, (!sign) ? "-" : "+"));
+        res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+    }
+    //In other cases execute operations between token
+    //and computations as performed
+    else {
+        //temporary value
+        value tmp = Execute(intSign, aux.lst.back(), tokenVal);
+        //Else push it to the end of result list with operation
+        res.lst.insert(res.lst.end(), { value(0, (!sign) ? "-" : "+"), tmp } );
+        comp = true;
+    }
+}
+
+//Computating both regular expression values
+MatrixCalc::value MatrixCalc::ProcessBothRegEq(const std::string &oper, const value &f, const value &s) {
+    //Result value
+    value res;
+    
+    //In case of summing or subtraction
+    if (oper == "+" || oper == "-")
+        res = SumSubRegEq(oper, f, s);
+    //In case of multiplication or division
+    if (oper == "*" || oper == "/")
+        res = MultiDivRegEq(oper, f, s);
+    //In case of power raising
+    else
+        res = PowRaiseRegEq(f, s);
+}
+
+//Computating first matrix variable and second token variable
+MatrixCalc::value MatrixCalc::ProcessMatrixAndToken(const std::string &oper, const value &f, const value &s) {
+    //Result value
+    value res;
+    
+    //In case of matrix and token multiplication
+    if (oper == "*")
+        res = MultiTokenMatrix(f, s);
+    //In case of matrix and token division
+    else if (oper == "/") {
+        //Temporary value for further calculations
+        value tmp; tmp.eq = "1 / (" + s.eq + ")";
+        //res = MatrixNumMulti(tmp, first);
+        //If matrix is complex insert values
+        //of first matrix, then multiplication
+        //and temporary value
+        if (!f.lst.empty()) {
+            res.lst.insert(res.lst.end(), f.lst.begin(), f.lst.end());
+            res.lst.insert(res.lst.end(), { value(0, "*"), tmp } );
+        }
+        //In other cases set initialize list of values
+        else res.lst.insert(res.lst.end(), { f, value(0, "*"), tmp } );
+        //Simplify result equation and in case of error due calculation
+        //return it
+        res = AnalizeModifyValue(std::move(res));
+        if (res.state == 4) return res;
+        //Set result as matrix
+        res.state = 1;
+    }
+    //In other cases just add operator
+    else
+        res = AddOperTokenMatrix(oper, f, s);
+    return res;
+}
+
+//Computating first token variable and second matrix variable
+MatrixCalc::value MatrixCalc::ProcessTokenAndMatrix(const std::string &oper, const value &f, const value &s) {
+    //Result value
+    value res;
+    
+    //In case of token and matrix multiplication
+    if (oper == "*")
+        res = MultiTokenMatrix(f, s);
+    //In case of division return error
+    else if (oper == "/") {
+        error = "error: '/': " + FinResGenerate(f, true) + ": "
+            + FinResGenerate(s, true) + ": division of regular expression and matrix is not permitted";
+        res.state = 4;
+    }
+    //In case of power raise return error
+    else if (oper == "^") {
+        error = "error: '^': " + FinResGenerate(f, true) + ": "
+            + FinResGenerate(s, true) + ": regular expression raising to a matrix is not permitted";
+        res.state = 4;
+    }
+    //In other cases just add the operation
+    else res = AddOperTokenMatrix(oper, f, s);
+    return res;
 }
 
 //Matricies summing and subtract
@@ -1286,10 +1578,15 @@ MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
 	//Is there is some token in regular expression
 	bool isThereToken = false;
 
-	//In case of reg expression ('f') value is simple and matrix ('s')
 	if (f.eq.find(token) != std::string::npos) isThereToken = true;
-	//In case, when matrix is complex
-	if (!s.lst.empty()) return MatrixVectorNumMulti(s, f);
+    //In case of reg expression ('f') value is simple and matrix ('s')
+    //is complex
+	if (!s.lst.empty() && f.lst.empty()) return MatrixVectorNumMulti(s, f);
+    //In case of reg expression ('f') value is complex and matrix ('s')
+    //is simple
+    else if (s.lst.empty() && !f.lst.empty()) return MultiComplexRegEqSimpleMatrix(f, s);
+    //In case of both regular expression and matrix are complex values
+    else if (!s.lst.empty() && !s.lst.empty()) return MultiComplexRegEqComplexMatrix(f, s);
 	//In case when regular expression is complex: or it has
 	//multiple elements either it has some basic function
 	else if (isThereToken) {
@@ -1554,13 +1851,11 @@ MatrixCalc::value MatrixCalc::MatrixVectorNumMulti(const value &m, const value &
 	value res;
 	//matrix values
 	std::list<value> lst = m.lst;
-	//number of braces
-	int brace = 0;
 	//Should we add brace in multiplying equation
-	bool shAddBr = false;
+	bool shAddBr = DoesComplexValHaveMultiple(m);
 
 	//Check complexity of equation
-	for (auto it = m.lst.begin(); it != m.lst.end(); ++it) {
+	/*for (auto it = m.lst.begin(); it != m.lst.end(); ++it) {
 		//If number of braces is zero (we're not inside function
 		//or complex equation) and there is subtracting or summing
 		//we initiate brace adding to equation
@@ -1569,7 +1864,7 @@ MatrixCalc::value MatrixCalc::MatrixVectorNumMulti(const value &m, const value &
 		}
 		else if (it->state == 5 && it->eq == "(") ++brace;
 		else if (it->state == 5 && it->eq == ")") --brace;
-	}
+	}*/
 	//Generate final equation for result value
 	res.lst.push_back(r);
 	//Add multiplying operator to list
@@ -2707,7 +3002,6 @@ MatrixCalc::value MatrixCalc::MultiDivRegEq(const std::string &oper, const value
 		res.state = 2;
 		res.eq = expr;
 	}
-
 	return res;
 }
 
@@ -3355,6 +3649,58 @@ MatrixCalc::value MatrixCalc::PowRaiseRegEq(const value &f, const value &s) {
 	//Set state as regular equation, and return it
 	res.state = 2;
 	return res;
+}
+
+//Multiplication of complex regular expression and simple matrix
+MatrixCalc::value MatrixCalc::MultiComplexRegEqSimpleMatrix(const value &r, const value &m) {
+    //Result value
+    value res;
+    //'Does regular expression has multiple values statement' state
+    bool multiEl = DoesComplexValHaveMultiple(r);
+    
+    //If regular expression has multiple elements
+    //we should surround it with braces
+    if (multiEl) res.lst.push_back(value(5, "("));
+    res.lst.insert(res.lst.end(), r.lst.begin(), r.lst.end());
+    if (multiEl) res.lst.push_back(value(5, ")"));
+    //Now add multiplication operation and matrix value to
+    //the end of result list
+    res.lst.insert(res.lst.end(), { value(0, "*"), m });
+    //Set state as matrix and return it
+    res.state = 1;
+    return res;
+}
+
+//Mutliplication of complex regular expression and complex matrix
+MatrixCalc::value MatrixCalc::MultiComplexRegEqComplexMatrix(const value &r, const value &m) {
+    //Result value
+    value res;
+    //'Does value has multiple elements' statement
+    bool multiElRegEq = DoesComplexValHaveMultiple(r),
+        multiElMatrix = DoesComplexValHaveMultiple(m);
+    
+    //If regular expression has multiple elements
+    //we should surround it with braces
+    if (multiElRegEq) res.lst.push_back(value(5, "("));
+    res.lst.insert(res.lst.end(), r.lst.begin(), r.lst.end());
+    if (multiElRegEq) res.lst.push_back(value(5, ")"));
+    //Add multiplication to the end of the list
+    res.lst.push_back(value(0, "*"));
+    //If matrix expression has multiple elements
+    //we should surround it with braces
+    if (multiElMatrix) res.lst.push_back(value(5, "("));
+    res.lst.insert(res.lst.end(), m.lst.begin(), m.lst.end());
+    if (multiElMatrix) res.lst.push_back(value(5, ")"));
+    //If both values doesn't have multiple elements
+    //let's simplify this equation. And if some error occured
+    //due calculations return it
+    if (!multiElMatrix && !multiElRegEq) {
+        res = EqAnalyzeSimplify(std::move(res));
+        if (res.state == 4) return res;
+    }
+    //Set state as matrix and return it
+    res.state = 1;
+    return res;
 }
 
 //Get error string
