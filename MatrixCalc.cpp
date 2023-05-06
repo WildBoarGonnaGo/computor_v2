@@ -1091,9 +1091,13 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 	else if (first.state == 2 && second.state == 2) {
 		//In case of summing or subtraction
 		if (oper == "+" || oper == "-")
-			return SumSubRegEq(oper, first, second);
+			res = SumSubRegEq(oper, first, second);
 		//In case of multiplication or division
 		if (oper == "*" || oper == "/")
+			res = MultiDivRegEq(oper, first, second);
+		//In case of power raising
+		else
+			res = PowRaiseRegEq(first, second);
 	}
 	//If first variable is matrix and second is token
 	else if (first.state == 1 && second.state == 3) {
@@ -1282,8 +1286,7 @@ MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
 	//Is there is some token in regular expression
 	bool isThereToken = false;
 
-	//Search token in regular expression, and if there is set
-	//'isThereToken' as true
+	//In case of reg expression ('f') value is simple and matrix ('s')
 	if (f.eq.find(token) != std::string::npos) isThereToken = true;
 	//In case, when matrix is complex
 	if (!s.lst.empty()) return MatrixVectorNumMulti(s, f);
@@ -1464,6 +1467,8 @@ MatrixCalc::value MatrixCalc::MultiTokenMatrix(const value &f, const value &s) {
 	value res;
 	//number of braces
 	int brace = 0;
+	//auxiliary value
+	value aux;
 
 	//In case of complex matrix value
 	if (!matrix.lst.empty()) {
@@ -1472,17 +1477,35 @@ MatrixCalc::value MatrixCalc::MultiTokenMatrix(const value &f, const value &s) {
 			//braces encounter we multiplicate token
 			//and intermidiate value
 			if (it->state == 0 && !brace && (it->eq == "+" || it->eq == "-")) {
-				res.lst.push_back(value(0, "*"));
-				res.lst.push_back(token);
-			}
+				//Remember, token can be a matrix, so appending scenario
+				//Depends on token position (is it first or second value)
+				//because of next matrix features:
+				//	A * (B + C) = AB + AC
+				//	(B + C) * A = BA + CA
+				if (f.state == 3)
+					aux.lst.insert(aux.lst.begin(), { token, value(0, "*") });
+				else
+					aux.lst.insert(aux.lst.end(), { value(0, "*"), token });
+				//Insert auxiliary list to the end of result list
+				res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+				//Clear auxiliary list and proceed to next
+				//iteration
+				aux.lst.clear();
+				continue ;
+ 			}
 			//In case of open brace increment brace counter
 			else if (it->state == 5 && it->eq == "(") ++brace;
 			//In case of close brace decrement brace counter
 			else if (it->state == 5 && it->eq == ")") --brace;
-			res.lst.push_back(*it);
+			aux.lst.push_back(*it);
 		}
-		res.lst.push_back(value(0, "*"));
-		res.lst.push_back(token);
+		if (f.state == 3)
+			aux.lst.insert(aux.lst.begin(), { token, value(0, "*") });
+		else
+			aux.lst.insert(aux.lst.end(), { value(0, "*"), token });
+		//Insert auxiliary list to the end of result list
+		res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+		//Set state as matrix and return result
 		res.state = 1;
 		return res;
 	}
@@ -2379,7 +2402,6 @@ MatrixCalc::value MatrixCalc::ComplexRegEqAnalyzerSumSub(const std::string &oper
 	if (itF->state == 2) numF = *(itF++);
 	//Else we just 'numF' value as '1'
 	else numF = value(2, "1");
-
 	//The same algorithm for second complex value
 	if (itS->state == 2) numS = *(itS++);
 	else numS = value(2, "1");
@@ -2590,6 +2612,11 @@ void MatrixCalc::CheckZero(value &src) {
 			it = src.lst.erase(it);
 		}
 	}
+	//If only one value left, let's assign it
+	//to the 'src' value, because it's most likely
+	//a simple, not a complex value
+	if (src.lst.size() == 1)
+		src = src.lst.back();
 }
 
 void MatrixCalc::IterateOverSecValueFinGen(value &res,
@@ -2652,19 +2679,36 @@ MatrixCalc::value MatrixCalc::MultiDivRegEq(const std::string &oper, const value
 	//is simple and operation is multiplication
 	if (((f.lst.empty() && !s.lst.empty())
 		 || (!f.lst.empty() && s.lst.empty())) && oper == "*")
-		return MultiDivSimpleComplexRegEq(oper, f, s);
+		res = MultiDivSimpleComplexRegEq(oper, f, s);
 	//In case of first value is complex and the second is simple
 	//And operatiom is division
 	else if (!f.lst.empty() && s.lst.empty() && oper == "/")
-		return MultiDivSimpleComplexRegEq(oper, f, s);
+		res =  MultiDivSimpleComplexRegEq(oper, f, s);
 	//In case of first value is simple, second is complex,
 	//and operation is division
 	else if (f.lst.empty() && !s.lst.empty() && oper == "/")
-		return DivisionSimpleByComplexRegEq(f, s);
+		res = DivisionSimpleByComplexRegEq(f, s);
 	//In case of both values are complex
-	else if (!f.lst.empty() && !s.lst.empty()) {
-		
+	else if (!f.lst.empty() && !s.lst.empty())
+		res = MultiDivBothComplexRegEq(oper, f, s);
+	//In other cases calculate them as simple
+	//regular values
+	else {
+		//Regular expression calculator
+		RevPolNotation pol(funcs);
+		//Expressoin string
+		std::string expr = "(" + f.eq + ") " + oper + "(" + s.eq + ")";
+		//Let's calculate expression, and in case of error return it
+		pol.setInfixExpr(std::move(expr));
+		if (!pol.getErrMsg().empty()) { res.state = 4; return res; }
+		expr = pol.CalcIt();
+		if (!pol.getErrMsg().empty()) { res.state = 4; return res; }
+		//set state as regular equaiton
+		res.state = 2;
+		res.eq = expr;
 	}
+
+	return res;
 }
 
 //Multiplicatoin of simple regular equation and complex regular equation
@@ -2788,7 +2832,7 @@ MatrixCalc::value MatrixCalc::DivisionSimpleByComplexRegEq(const value &f, const
 }
 
 //Case of multiplication or division of complex regular equations
-MatrixCalc::value MatrixCalc::MultiDivBothComplexRegEq(std::string &oper, const value &f, const value &s) {
+MatrixCalc::value MatrixCalc::MultiDivBothComplexRegEq(const std::string &oper, const value &f, const value &s) {
 	//Result value
 	value res;
 	//'Does both values have multiple elements' statements
@@ -2796,17 +2840,89 @@ MatrixCalc::value MatrixCalc::MultiDivBothComplexRegEq(std::string &oper, const 
 	bool mF = DoesComplexValHaveMultiple(f), mS = DoesComplexValHaveMultiple(s);
 
 	//In case of one element has multiple elements and other is not
-	if ((mF && !mS) || (!mF && mS)) {
-		
+	if ((mF && !mS) || (!mF && mS))
+		return MultiDivComplexRegEqs(oper, f, s, mF, mS);
+	//In case of both elements have multiple values
+	else if (mF && mS) {
+		//Insert first element list inside braces
+		res.lst.push_back(value(5, "("));
+		res.lst.insert(res.lst.end(), f.lst.begin(), f.lst.end());
+		res.lst.push_back(value(5, ")"));
+		//Push operation value
+		res.lst.push_back(value(0, oper));
+		//Insert second element list inside braces
+		res.lst.push_back(value(5, "("));
+		res.lst.insert(res.lst.end(), s.lst.begin(), s.lst.end());
+		res.lst.push_back(value(5, ")"));
+		//Set it's state as regular equation and return it
+		res.state = 2;
+		return res;
 	}
-	//In other cases set
+	//In other cases insert first and second value lists (f.lst adn s.lst)
+	//with operation value in the midst
+	res.lst.insert(res.lst.end(), f.lst.begin(), f.lst.end());
+	res.lst.push_back(value(0, oper));
+	res.lst.insert(res.lst.end(), s.lst.begin(), s.lst.end());
+	//Set it state as regular equation
+	res.state = 2;
+	//Let's calculate equation and in case of error,
+	//return it
+	res = EqAnalyzeSimplify(std::move(res));
+	if (res.state == 4) return res;
+	//Check zero values is result value and return it
+	CheckZero(res);
+	return res;
 }
 
 //Multiplication or Division of complex regular equation with multiple elements and complex
 //regular equation with one element
-MatrixCalc::value MatrixCalc::MultiDivComplexRegEqs(std::string &oper,
-													const value &f, const value &s) {
+MatrixCalc::value MatrixCalc::MultiDivComplexRegEqs(const std::string &oper,
+													const value &f, const value &s,
+													const bool &mf, const bool &ms) {
+	//Result value
+	value res;
+	//Let's determine complex value with multiple elements
+	value multi = (mf) ? f : s;
+	//Let's determine complex value with only one element
+	value single = (mf) ? s : f;
+	//brace counter
+	int brace = 0;
+	//auxiliary value
+	value aux;
 
+	//Let's iterate over complex value with multiple elements
+	for (auto it = multi.lst.begin(); it != multi.lst.end(); ++it) {
+		//In case of open brace increment brace counter
+		if (it->state == 5 && it->eq == "(") ++brace;
+		//In case of close brace decrement brace counter
+		else if (it->state == 5 && it->eq == ")") --brace;
+		//In case of summing or subtraction outside braces
+		//multiply (devide) 'single' variable and element
+		//of multiple complex value ('multi')
+		else if (!it->state && (it->eq == "+" || it->eq == "-")
+				 && !brace) {
+			aux.lst.push_back(value(0, oper));
+			aux.lst.insert(aux.lst.end(), single.lst.begin(), single.lst.end());
+			//Let's computate and simplify equation element
+			//In case of error, return it
+			aux = EqAnalyzeSimplify(std::move(aux));
+			if (aux.state == 4) return aux;
+			//If auxiliary value is simple (list is simple)
+			if (aux.lst.empty() || !aux.eq.empty()) res.lst.push_back(aux);
+			//In other cases insert auxiliary list to the end of
+			//result list
+			else if (!aux.lst.empty())
+				res.lst.insert(res.lst.end(), aux.lst.begin(), aux.lst.end());
+			//Let's insert current operation to the end of result list
+			//and proceed to next iteration
+			res.lst.push_back(value(0, it->eq));
+			continue ;
+		}
+	}
+	CheckZero(res);
+	//Set state as regular equation and return it
+	res.state = 2;
+	return res;
 }
 
 //Analyze element for multiplications or division
@@ -2911,6 +3027,8 @@ MatrixCalc::value MatrixCalc::EqAnalyzeSimplify(value &&src) {
             //Clear auxiliary list and proceed to next iteration
             aux.lst.clear();
             aux.eq.clear();
+			//Let's add current operation to the end of result list
+			res.lst.push_back(value(0, it->eq));
             continue ;
         }
         aux.lst.push_back(*it);
@@ -3169,6 +3287,74 @@ MatrixCalc::value MatrixCalc::MatrixAnalyzeSimplifySecondIt(value &src, std::lis
         res.state = state;
         return res;
     }
+}
+
+//Regular equation power raising
+MatrixCalc::value MatrixCalc::PowRaiseRegEq(const value &f, const value &s) {
+	//Result value
+	value res;
+	//'Does value have multiple elements' statements for
+	//both variables ('f' and 's')
+	bool mF, mS;
+
+	//In case of first value is complex and other is simple
+	if (!f.lst.empty() && s.lst.empty()) {
+		//Does first value has multiple elements
+		mF = DoesComplexValHaveMultiple(f);
+		//If first value has multiple elements add to result
+		//list open brace, 'f' value list, close brace,
+		//power raise operation and second value
+		if (mF) res.lst.push_back(value(5, "("));
+		res.lst.insert(res.lst.end(), f.lst.begin(), f.lst.end());
+		if (mF) res.lst.push_back(value(5, ")"));
+		res.lst.insert(res.lst.end(), { value(0, "^"), s } );
+	}
+	//In case of first value is simple and other is complex
+	else if (f.lst.empty() && !s.lst.empty()) {
+		mS = DoesComplexValHaveMultiple(s);
+		//If second value has multiple elements add to result
+		//list open brace, 's' value list, close brace.
+		//power raise operation and second value add to
+		//the beginning of the result list
+		if (mS) res.lst.push_back(value(5, "("));
+		res.lst.insert(res.lst.end(), s.lst.begin(), s.lst.end());
+		if (mS) res.lst.push_back(value(5, ")"));
+		res.lst.insert(res.lst.begin(), { value(0, "^"), f } );
+	}
+	//In case of both values are complex
+	else if (!f.lst.empty() && !s.lst.empty()) {
+		mF = DoesComplexValHaveMultiple(f);
+		mS = DoesComplexValHaveMultiple(s);
+
+		//If one of these values have multiple elements
+		//add braces as in previous cases
+		if (mF) res.lst.push_back(value(5, "("));
+		res.lst.insert(res.lst.end(), f.lst.begin(), f.lst.end());
+		if (mF) res.lst.push_back(value(5, ")"));
+		res.lst.push_back(value(0, "^"));
+		if (mS) res.lst.push_back(value(5, "("));
+		res.lst.insert(res.lst.end(), s.lst.begin(), s.lst.end());
+		if (mS) res.lst.push_back(value(5, ")"));
+	}
+	//In other cases both values are simple and
+	//calculate them with regular expression calculator
+	else {
+		//Expression calculator
+		RevPolNotation pol(funcs);
+		//expression itself
+		std::string exp = "(" + f.eq + ") ^ (" + s.eq + ")";
+		//Calculate expression, in case of error
+		//return it
+		pol.setInfixExpr(std::move(exp));
+		if (!pol.getErrMsg().empty()) { res.state = 4; return res; }
+		exp = pol.CalcIt();
+		if (!pol.getErrMsg().empty()) { res.state = 4; return res; }
+		//Assign calculation result to result equation
+		res.eq = exp;
+	}
+	//Set state as regular equation, and return it
+	res.state = 2;
+	return res;
 }
 
 //Get error string

@@ -169,10 +169,11 @@ class MatrixCalc {
 	//Case of division simple value by complex value (both values are regular equations)
 	value DivisionSimpleByComplexRegEq(const value &f, const value &s);
 	//Case of multiplication or division of complex regular equations
-	value MultiDivBothComplexRegEq(std::string &oper, const value &f, const value &s);
+	value MultiDivBothComplexRegEq(const std::string &oper, const value &f, const value &s);
 	//Multiplication or Division of complex regular equation with multiple elements and complex
 	//regular equation with one element
-	value MultiDivComplexRegEqs(std::string &oper, const value &f, const value &s);
+	value MultiDivComplexRegEqs(const std::string &oper, const value &f, const value &s,
+								const bool &mf, const bool &ms);
 	//Analyze element of regular equation for multiplications or division
 	value AnalyzeForMultiDiv(const value &src, value &m, value &p, const int &state);
 	//Equation simplifier and analyzer for source value
@@ -185,6 +186,8 @@ class MatrixCalc {
     //iteration
     value MatrixAnalyzeSimplifySecondIt(value &src, std::list<value>::iterator &it,
                                         const int &state, const value &aux);
+	//Regular equation power raising
+	value PowRaiseRegEq(const value &f, const value &s);
 public:
 	//Default constructor
 	MatrixCalc() = delete;
