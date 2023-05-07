@@ -96,6 +96,10 @@ class MatrixCalc {
 	value funcExprExec(const std::string &oper, std::stack<value> &nums);
 	//Execute some base operands between two values
 	value Execute(const std::string &oper, const value &first, const value &second);
+    //Process matrix and regular equation
+    value ProcessMatrixAndRegEq(const std::string &oper, const value &f, const value &s);
+    //Process regular equation and matrix
+    value ProcessRegEqAndMatrix(const std::string &oper, const value &f, const value &s);
     //Process token and regular equation
     value ProcessTokenAndRegEq(const std::string &oper, const value &reg, const value &tokenVal);
     //Summing and subraction of regular equation and token
@@ -112,12 +116,23 @@ class MatrixCalc {
     //is not first value
     void SumSubComplexRegEqIsNotFirstToken(const std::string &oper, value &res, value &aux, bool &sign,
                                        bool &comp, bool &isToken, const value &tokenVal);
+    //Multiplication or divison of regex token
+    value MultiDivRegExToken(const std::string &oper, const value &reg, const value &tok,
+                             const bool &isTokenFirst);
+    //Multiplication of complex regular expression and token
+    value MultiComplexRegExToken(const value &reg, const value &tok, const bool &isTokenFirst);
+    //Check and fix auxiliary value, due regular expression and token multiplication
+    void CheckAndFixAuxValueToken(value &aux, const value &tok, const bool &isTokenFirst);
+    //Power raising of token and regular equations
+    value PowRaiseRegEqToken(const value &reg, const value &tok, const bool &isTokenFirst);
     //Computating both regular expression value
     value ProcessBothRegEq(const std::string &oper, const value &f, const value &s);
     //Computating first matrix variable and second token variable
     value ProcessMatrixAndToken(const std::string &oper, const value &f, const value &s);
     //Computating first token variable and second matrix variable
     value ProcessTokenAndMatrix(const std::string &oper, const value &f, const value &s);
+    //Computating both token values
+    value ProcessBothTokens(const std::string &oper, const value &f, const value &s);
 	//Matricies summing and subtraction
 	value MatriciesSumSub(const std::string &oper, const value &first, const value &second);
 	//Matrix elements multiply results for socket
@@ -128,6 +143,8 @@ class MatrixCalc {
 	value MatrixNumMulti(const value &f, const value &s);
 	//Matrix power raising. 'f' is a matrix, 's' should be integer number
 	value MatrixPowerRaise(const value &f, const value &s);
+    //Complex matrix power raise. 'f' is a matrix, 's' should be integer number
+    value ComplexMatrixPowerRaise(const value &f, const value &s);
 	//Denomination elements for regular expression
 	std::list<std::string> DenomElems(const std::string &src);
 	//Generating string in case of error, or in case of result
