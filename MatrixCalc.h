@@ -96,6 +96,8 @@ class MatrixCalc {
 	value funcExprExec(const std::string &oper, std::stack<value> &nums);
 	//Execute some base operands between two values
 	value Execute(const std::string &oper, const value &first, const value &second);
+    //Process both matricies
+    value ProcessMatricies(const std::string &oper, const value &f, const value &s);
     //Process matrix and regular equation
     value ProcessMatrixAndRegEq(const std::string &oper, const value &f, const value &s);
     //Process regular equation and matrix
@@ -183,7 +185,7 @@ class MatrixCalc {
 	//simple regular equation
 	value SumSubComplexSimpleRegEq(const std::string &oper, const value &f, const value &s);
 	//Summing or subtracting both complex regular expression
-	value SumSubComplexComplexRegEq(const std::string &oper, const value &f, const value &s);
+	value SumSubComplexComplexRegEq(const std::string &oper, const value &f, const value &s, const int &state);
 	//Complex reg values values analizer for summing and subtraction
 	value ComplexRegEqAnalyzerSumSub(const std::string &oper, const value &f, const value &s);
 	//Iterate over the second value for summing and subtraction
@@ -191,7 +193,7 @@ class MatrixCalc {
 									const bool &signF, const bool &simF,
 									std::list<std::list<value>::const_iterator> &auxLst,
 									std::list<std::list<value>::const_iterator> &genLst,
-									const value &res);
+									const value &res, const int &state);
 	//Check value if it has zero values
 	void CheckZero(value &src);
 	//Iterate second value components to
@@ -231,6 +233,8 @@ class MatrixCalc {
     value MultiComplexRegEqSimpleMatrix(const value &r, const value &m);
     //Mutliplication of complex regular expression and complex matrix
     value MultiComplexRegEqComplexMatrix(const value &r, const value &m);
+    //Check zero and unit values in complex equation
+    void CheckZeroAndUnitsInComplexValue(value &src);
 public:
 	//Default constructor
 	MatrixCalc() = delete;

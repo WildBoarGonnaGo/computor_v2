@@ -463,6 +463,11 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 	//result value
 	value res;
 
+    //In case of token
+    if (var.state == 3) {
+        //In case of complex value
+        
+    }
 	//In case of basic matrix function
 	if (matrixSearch != baseFuncsMatrix.end()) {
 		//Check is variable a matrix, if it's not return error
@@ -1003,7 +1008,7 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 
 	//In case of first and second variables are matricies
 	if (first.state == 1 && second.state == 1) {
-		//in case of summing and subtract
+		/*//in case of summing and subtract
 		if (oper == "+" || oper == "-") res = MatriciesSumSub(oper, first, second);
 		//in case of multiplication
 		else if (oper == "*") res = MatrixMulti(first, second);
@@ -1018,7 +1023,8 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
 			error = "error: '/': " + FinResGenerate(first, true) + ": "
 				+ FinResGenerate(second, true) + ": matricies power raise is not permitted";
 			res.state = 4;
-		}
+		}*/
+        res = ProcessMatricies(oper, first, second);
 	}
 	//In case of first variable is matrix and second is regular expression
 	else if (first.state == 1 && second.state == 2) {
@@ -1174,6 +1180,30 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
     else if (first.state == 3 && second.state == 3)
         return ProcessBothTokens(oper, first, second);
 	return res;
+}
+
+//Process both matricies
+MatrixCalc::value MatrixCalc::ProcessMatricies(const std::string &oper, const value &f, const value &s) {
+    //Result value
+    value res;
+    
+    //in case of summing and subtract
+    if (oper == "+" || oper == "-") res = MatriciesSumSub(oper, f, s);
+    //in case of multiplication
+    else if (oper == "*") res = MatrixMulti(f, s);
+    //In case of division operation return error
+    else if (oper == "/") {
+        error = "error: '/': " + FinResGenerate(f, true) + ": "
+        + FinResGenerate(s, true) + ": matricies division is not permitted";
+        res.state = 4;
+    }
+    //In case of power raising return error
+    else if (oper == "^") {
+        error = "error: '/': " + FinResGenerate(f, true) + ": "
+            + FinResGenerate(s, true) + ": matricies power raise is not permitted";
+        res.state = 4;
+    }
+    return res;
 }
 
 //Process matrix and regular equation
@@ -1844,7 +1874,7 @@ MatrixCalc::value MatrixCalc::MatriciesSumSub(const std::string &oper,
 		return SimpleComplexMatrixSumSub(first, second, oper);
 	//In case of both values are complex matrix equations
 	if (!first.lst.empty() && !second.lst.empty())
-		return ComplexComplexMatrixSumSub(first, second, oper);
+        return SumSubComplexComplexRegEq(oper, first, second, 1);//return ComplexComplexMatrixSumSub(first, second, oper);
 	//Compare size of matricies. If their's sizes are not equal, return error
 	if (first.matrix.getRow() != second.matrix.getRow() &&
 			first.matrix.getRow() != second.matrix.getColumn()) {
@@ -2861,6 +2891,33 @@ MatrixCalc::value MatrixCalc::AnalizeModifyValue(value &&src) {
     return res;
 }
 
+//Multiplying of complex matrix equations
+MatrixCalc::value MatrixCalc::ComplexComplexMatrixMulti(const value &f, const value &s) {
+    //Result value
+    value res;
+    //'Does value have multiple elements' statement for both values
+    bool fComp = DoesComplexValHaveMultiple(f), sComp = DoesComplexValHaveMultiple(s);
+    
+    //If value have multiple elements
+    //surround it with braces in result value
+    //and add multiplication sign between them
+    if (fComp) res.lst.push_back(value(5, "("));
+    res.lst.insert(res.lst.end(), f.lst.begin(), f.lst.end());
+    if (fComp) res.lst.push_back(value(5, ")"));
+    res.lst.push_back(value(0, "*"));
+    if (sComp) res.lst.push_back(value(5, "("));
+    res.lst.insert(res.lst.end(), s.lst.begin(), s.lst.end());
+    if (sComp) res.lst.push_back(value(5, ")"));
+    //Set state as matrix and return it
+    res.state = 1;
+    
+    //If non of these values has no multiple elements
+    //let's analyze it
+    if (!fComp && !sComp)
+        res = EqAnalyzeSimplify(std::move(res));
+    return res;
+}
+
 MatrixCalc::value MatrixCalc::SumSubRegEq(const std::string &oper, const value &f, const value &s) {
 	//Result value
 	value res;
@@ -2872,7 +2929,7 @@ MatrixCalc::value MatrixCalc::SumSubRegEq(const std::string &oper, const value &
 	//the second is simple
 	else if (!f.lst.empty() && s.lst.empty()) return SumSubComplexSimpleRegEq(oper, f, s);
 	//In case of both regular equations are complex
-	else if (!f.lst.empty() && !s.lst.empty()) return SumSubComplexComplexRegEq(oper, f, s);
+	else if (!f.lst.empty() && !s.lst.empty()) return SumSubComplexComplexRegEq(oper, f, s, 2);
 	//Expression calculator, in case of error return it
 	RevPolNotation pol(funcs);
 
@@ -3086,7 +3143,7 @@ MatrixCalc::value MatrixCalc::SumSubComplexSimpleRegEq(const std::string &oper, 
 }
 
 //Summing or subtracting both complex regular expression
-MatrixCalc::value MatrixCalc::SumSubComplexComplexRegEq(const std::string &oper, const value &f, const value &s) {
+MatrixCalc::value MatrixCalc::SumSubComplexComplexRegEq(const std::string &oper, const value &f, const value &s, const int &state) {
 	//Result value and complex auxiliary values for both
 	//complex values
 	value res, auxF;
@@ -3123,7 +3180,7 @@ MatrixCalc::value MatrixCalc::SumSubComplexComplexRegEq(const std::string &oper,
 		//In case of summing or subtracting outside braces
 		//Let's iterate over the second complex value
 		else if (!itF->state && (itF->eq == "+" || itF->eq == "-") && !brace) {
-			tmp = IterateOverSecValueSumSub(oper, auxF, s, signF, simF, auxLst, genLst, res);
+			tmp = IterateOverSecValueSumSub(oper, auxF, s, signF, simF, auxLst, genLst, res, state);
 			//In case of error return it
 			if (tmp.state == 4) return tmp;
 			//Insert to the end result list temporary value list
@@ -3136,7 +3193,7 @@ MatrixCalc::value MatrixCalc::SumSubComplexComplexRegEq(const std::string &oper,
 		auxF.lst.push_back(*itF);
 	}
 	//Calculate computation value for final iteratrion
-	tmp = IterateOverSecValueSumSub(oper, auxF, s, signF, simF, auxLst, genLst, res);
+	tmp = IterateOverSecValueSumSub(oper, auxF, s, signF, simF, auxLst, genLst, res, state);
 	//If there was error due calculations, return it
 	if (tmp.state == 4) return tmp;
 	//Itearate over elements of second value to generate final expression
@@ -3144,7 +3201,7 @@ MatrixCalc::value MatrixCalc::SumSubComplexComplexRegEq(const std::string &oper,
 	//Check zero elements in result value list
 	CheckZero(res);
 	//Set result as regular value and return it
-	res.state = 1;
+	res.state = state;
 	return res;
 }
 
@@ -3195,7 +3252,7 @@ MatrixCalc::value MatrixCalc::IterateOverSecValueSumSub(const std::string &oper,
 														const bool &signF, const bool &simF,
 														std::list<std::list<value>::const_iterator> &auxLst,
 														std::list<std::list<value>::const_iterator> &genLst,
-														const value &res) {
+														const value &res, const int &state) {
 	//Temporary value
 	value tmp;
 	//brace counter
@@ -3336,7 +3393,7 @@ MatrixCalc::value MatrixCalc::IterateOverSecValueSumSub(const std::string &oper,
 		auxLst.clear();
 	}
 	//Set tmp state as regular equation ('2')
-	tmp.state = 2;
+	tmp.state = state;
 	return tmp;
 }
 
@@ -3747,7 +3804,7 @@ MatrixCalc::value MatrixCalc::EqAnalyzeSimplify(value &&src) {
 	//Set of norm functions
 	std::set<std::string> setNormFunc = { "lonenorm", "lpnorm", "ltwonorm", "linfnorm", "det" };
     //Set of matrix functions
-    std::set<std::string> setMatrixFunction = {  };
+    std::set<std::string> setMatrixFunc = { "inv", "transp", "det", "adj" };
 	//brace counter
 	int brace = 0;
 	//state of reviewd function due iteration
@@ -3778,7 +3835,7 @@ MatrixCalc::value MatrixCalc::EqAnalyzeSimplify(value &&src) {
                 aux = RegEqAnalyzeSimplifySecondIt(src, it, state, aux);
             //In case of matrix function iterate until next value
             //is equal to previous
-            if (state == 1)
+            if (state == 1 || state == 3)
                 aux = MatrixAnalyzeSimplifySecondIt(src, it, state, aux);
             //If there was error due calculations, return it
             if (aux.state == 4) return aux;
@@ -3797,12 +3854,20 @@ MatrixCalc::value MatrixCalc::EqAnalyzeSimplify(value &&src) {
         //If function is norm and outside of braces set state
         //as regular equation
         else if (auto s = setNormFunc.find(it->eq); !it->state && s != setNormFunc.end() && !brace)
+            state = 2;
+        //If function is matrix funciton (like 'inversion') and outside braces
+        //set state as matrix equation
+        else if (auto s = setMatrixFunc.find(it->eq); !it->state && s != setNormFunc.end() && !brace)
             state = 1;
-        
+        //In case of token outside braces set state as token
+        else if (it->state == 3 && !brace)
+            state = 3;
         aux.lst.push_back(*it);
 	}
     //Set state for result and return it
     res.state = src.state;
+    //Check for zeros and units complex expression
+    CheckZeroAndUnitsInComplexValue(res);
     return res;
 }
 
@@ -4175,6 +4240,73 @@ MatrixCalc::value MatrixCalc::MultiComplexRegEqComplexMatrix(const value &r, con
     //Set state as matrix and return it
     res.state = 1;
     return res;
+}
+
+//Check zero and unit values in complex equation
+void MatrixCalc::CheckZeroAndUnitsInComplexValue(value &src) {
+    //brace counter
+    int brace = 0;
+    //'Zero multiplier outside braces' statement
+    //Initially it's false;
+    bool zero = false;
+    //Iterator savepoint.
+    auto save = src.lst.begin();
+    //Set of norm functions
+    std::set<std::string> setNormFunc = { "lonenorm", "lpnorm", "ltwonorm", "linfnorm", "det" };
+    //Set of matrix functions
+    std::set<std::string> setMatrixFunc = { "inv", "transp", "det", "adj" };
+    //Set of multiplier
+    int state = 0;
+    
+    //Let's try to find 'zero' value in complex expression
+    for (auto it = src.lst.begin(); it != src.lst.end(); ++it) {
+        //In case of open brace, increment brace counter
+        if (it->state == 5 && it->eq == "(") ++brace;
+        //In case of close brace, decrement brace counter
+        else if (it->state == 5 && it->eq == ")") --brace;
+        //In case of zero outside braces set 'zero' as true
+        else if (it->state == 2 && it->eq == "0" && !brace)
+            { zero = true; break ; }
+    }
+    //Let's iterate over source list values
+    for (auto it = src.lst.begin(); it != src.lst.end(); ++it) {
+        //In case of open brace, increment brace counter
+        if (it->state == 5 && it->eq == "(") ++brace;
+        //In case of close brace, decrement brace counter
+        else if (it->state == 5 && it->eq == ")") --brace;
+        //In case of unit multiplier delete it or in case of
+        //Or in case of multiplication complex regular element by zero
+        else if (state == 2 && ((it->state == 2 && it->eq == "1")
+                || (!it->state && (it->eq == "*" || it->eq == "/") && zero)) && !brace) {
+            if (save == src.lst.begin()) ++it;
+            it = src.lst.erase(save, it);
+            save = it;
+            if (save != src.lst.begin()) --it;
+        }
+        //In case of non-regular element and multiplication or
+        //dividing operation, refresh 'save' iterator
+        if (!it->state  && (it->eq == "*" || it->eq == "/") && (!zero || state != 2))
+            save = it;
+        //If function is norm and outside of braces set state
+        //as regular equation
+        else if (auto s = setNormFunc.find(it->eq); !it->state && s != setNormFunc.end() && !brace)
+            state = 2;
+        //If function is matrix funciton (like 'inversion') and outside braces
+        //set state as matrix equation
+        else if (auto s = setMatrixFunc.find(it->eq); !it->state && s != setNormFunc.end() && !brace)
+            state = 1;
+        //In case of token outside braces set state as token
+        else if (it->state == 3 && !brace)
+            state = 3;
+    }
+    if (src.lst.size() == 1) {
+        if (src.lst.back().state == 1)
+            src.matrix = src.lst.back().matrix;
+        else if (src.lst.back().state == 2 || src.lst.back().state == 3)
+            src.eq = src.lst.back().eq;
+        src.state = src.lst.back().state;
+        src.lst.clear();
+    }
 }
 
 //Get error string
