@@ -464,10 +464,9 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 	value res;
 
     //In case of token
-    if (var.state == 3) {
-        //In case of complex value
-        
-    }
+    if (var.state == 3)
+        return funcExecuteTokenOrComplex(oper, var);
+    
 	//In case of basic matrix function
 	if (matrixSearch != baseFuncsMatrix.end()) {
 		//Check is variable a matrix, if it's not return error
@@ -475,7 +474,9 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			error = "error: " + oper + ": " + var.eq + "isn't a matrix";
 			res.state = 4; return res;
 		}
-		//{ "inv", "transp", "lonenorm", "ltwonorm", "linfnorm", "det", "adj" };
+		//In case of complex equation
+        if (!var.lst.empty())
+            return funcExecuteTokenOrComplex(oper, var);
 		if (*matrixSearch == "lonenorm") res = L1norm(var.matrix);
 		else if (*matrixSearch == "ltwonorm") res = L2norm(var.matrix);
 		else if (*matrixSearch == "transp") res = Transpose(var.matrix);
@@ -491,6 +492,9 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			error = "error: " + oper + ": " + var.matrix.getMatrix() + "isn't a regular expression";
 			res.state = 4; return res;
 		}
+        //In case of complex equation
+        if (!var.lst.empty())
+            return funcExecuteTokenOrComplex(oper, var);
 		//Regular expression calculator
 		RevPolNotation pol(funcs);
 		pol.setInfixExpr(oper + "(" + var.eq + ")");
@@ -503,6 +507,88 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 		res.state = 1;
 	}
 	return res;
+}
+
+//Executing functions with token parameter
+MatrixCalc::value MatrixCalc::funcExecuteTokenOrComplex(const std::string &oper, const value &var) {
+    //Result value
+    value res;
+    //"inv", "transp", "lpnorm", "lonenorm", "ltwonorm", "linfnorm", "det", "adj"
+    //Set of functions that returns regular equation
+    std::set<std::string> setRegFunc = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
+        "acos", "asin", "atan", "ceil", "floor", "cosh", "log", "logt", "tanh", "deg", "sinh"};
+    //Set of norm functions
+    std::set<std::string> setNormFunc = { "lpnorm", "lonenorm", "ltwonorm", "linfnorm" };
+    //Set of functions that returns matricies
+    std::set<std::string> setMatrixFunc = { "inv", "transp", "det", "adj" };
+    //Is function is user defined
+    auto uds = funcs.find(oper);
+    
+    //In case of token is a complex value and we
+    //deal with user defind function
+    if (uds != funcs.end())
+        return ExposeUserDefFunc(uds->second, var);
+    //In case of token is complex value
+    //Generate result value
+    res.lst.insert(res.lst.end(), { value(0, oper), value(5, "(") });
+    if (!var.lst.empty())
+        res.lst.insert(res.lst.end(), var.lst.begin(), var.lst.end());
+    else
+        res.lst.push_back(var);
+    res.lst.push_back(value(5, ")"));
+    //If expression is amongst regular functions,
+    //set result state as regular expression state
+    if (auto s = setRegFunc.find(oper); s != setRegFunc.end())
+        res.state = 1;
+    //If expression is amongst norm functions,
+    //set result state as regular expression state
+    else if (auto s = setNormFunc.find(oper); s != setNormFunc.end())
+        res.state = 1;
+    //If expression is amongst matrix functions,
+    //set result state as matrix expression state
+    else if (auto s = setNormFunc.find(oper); s != setNormFunc.end())
+        res.state = 2;
+    return res;
+}
+
+//Expose user defined functions
+MatrixCalc::value MatrixCalc::ExposeUserDefFunc(const Func &f, const value &var) {
+    //Result value
+    value res;
+    //number of elements in equation
+    int num;
+    //equation string
+    std::string expr;
+    //Func equation
+    std::string fEq = f.equation;
+    
+    //if token is complex value, let's turn
+    //it into string and assign it to 'expr'
+    //variable, or else just assign it's
+    //equation value to our expression string
+    expr = (!var.lst.empty()) ? FinResGenerate(var, false) : var.eq;
+    //Calculate number of elemens in equation
+    num = DenomElems(expr).size();
+    //if number of elements is greater than 1, add brace
+    //to the begining and the end of 'forReplace' string
+    if (num > 1) {
+        expr.insert(0, 1, '(');
+        expr.push_back(')');
+    }
+    //search iterator
+    size_t s = 0;
+    while(true) {
+        if (s = fEq.find(f.token, s); s != std::string::npos) {
+            fEq.replace(s, f.token.size(), expr);
+            s += expr.size();
+            continue ;
+        }
+        break ;
+    }
+
+    //Matrix expression calculator
+    MatrixCalc calc(funcs, matricies, fEq, token);
+    return calc.getFinValue();
 }
 
 //Return norm of p degree
@@ -548,7 +634,7 @@ void MatrixCalc::LPnorm() {
 		std::string matVar;
 		//If we deal with variable, assign to matrix 'm'
 		//If there is no such variable, return error
-		while(std::isalpha(infixEq[mi])) matVar.push_back(infixEq[mi++]);
+		/*while(std::isalpha(infixEq[mi])) matVar.push_back(infixEq[mi++]);
 		if (!matVar.empty()) {
 			if (auto search = matricies.find(matVar); search != matricies.end())
 				m = matricies[matVar];
@@ -579,7 +665,8 @@ void MatrixCalc::LPnorm() {
 			}
 			m.setMatrix(infixEq.substr(begin, mi + 1 - begin), funcs, matricies);
 			++mi;
-		}
+		}*/
+        
 		//Passing whitespaces and check if there is comma character
 		//and if there is no, return error
 		while (std::isspace(infixEq[mi])) ++mi;

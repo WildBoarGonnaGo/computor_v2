@@ -73,6 +73,10 @@ class MatrixCalc {
 	std::string MarkError(const std::string &src, int &i);
 	//Private method. It executes base and user defined functions
 	value funcExecute(const std::string &oper, const value &var);
+    //Executing functions with token parameter
+    value funcExecuteTokenOrComplex(const std::string &oper, const value &var);
+    //Expose user defined functions
+    value ExposeUserDefFunc(const Func &f, const value &var);
 	//Return norm of p degree
 	void LPnorm();
 	//Return infinite norm

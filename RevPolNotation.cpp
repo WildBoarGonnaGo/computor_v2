@@ -30,7 +30,7 @@ std::string			RevPolNotation::GetStringNumber(const std::string &str, int &i) {
 std::string RevPolNotation::prefixNum(const std::string &num, const std::string &oper) {
 	std::string res = num;
 
-	if ((res.size() == 1 && !res.compare("1") || (res.size() == 2 && !res.compare("-1"))))
+	if ((res.size() == 1 && !res.compare("1")) || (res.size() == 2 && !res.compare("-1")))
 		res.pop_back();
 	else res += oper;
 	return res;
@@ -481,7 +481,7 @@ std::list<std::string> RevPolNotation::ComplexSubSumAlpha(const std::string &ope
 
 		fAlpha.clear();
 		fNum.clear();
-		if ((!(*itF).compare("+") || !(*itF).compare("-") && (*itF).size() == 1)) continue ;
+		if ((!(*itF).compare("+") || !(*itF).compare("-")) && (*itF).size() == 1) continue ;
 		fNum = simplePrefixNum((*itF).substr(0, (*itF).find_first_not_of("-0123456789.")));
 		if ((*itF).find_first_not_of("-0123456789. *") != std::string::npos)
 			fAlpha = (*itF).substr((*itF).find_first_not_of("-0123456789. *"));

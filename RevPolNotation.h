@@ -12,9 +12,6 @@ typedef struct sFunc {
 	std::string equation;
 	//Does function have any matricies. If yes, isMatrix is true
 	bool isMatrix;
-	//Is token a matrix 0 - not defined, 1 - matrix,
-	//2 - regular variable
-	int tokenIsMatrix;
 
 } Func;
 
