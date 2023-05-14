@@ -218,7 +218,7 @@ void MatrixCalc::ProcessPostfix() {
 					continue ;
 				}
 				//Check if paramater is a token
-				else if (!token.empty() && tmp.size() == token.size() && !tmp.compare(token)) {
+				else if (token == tmp) {
 					//Generate value to push into postfix queue
 					value tokenValue; tokenValue.state = 3; tokenValue.eq = token;
 					//Check operations and operands order
@@ -230,7 +230,7 @@ void MatrixCalc::ProcessPostfix() {
 					continue ;
 				}
 				//Check if character is a complex number
-				else if (tmp.size() == 1 && !tmp.compare("i")) {
+				else if (tmp == "i") {
 					//Generate value to push into postfix queue
 					value complex; complex.state = 2; complex.eq = tmp;
 					//Check operand, operator order
@@ -263,6 +263,19 @@ void MatrixCalc::ProcessPostfix() {
 				//is a left brace. If we deal with it, we push function into
 				//operator stack, otherwise we check if we deal with base functions
 				else if (search != operPriority.end() && infixEq[i] == '(') {
+                    //In case of LPnorm function
+                    if (search->first == "lpnorm") {
+                        ++i;
+                        oper.push(tmp);
+                        //Brace counter
+                        int b = 1, s = i;
+                        for ( ; i < infixEq.size(); ++i) {
+                            if (infixEq[i] == '(') ++b;
+                            else if (infixEq[i] == ')') --b;
+                            else if (!b) break;
+                        }
+                        postfixQueue.push_back(value(1, infixEq.substr(s, i - s)));
+                    }
 					oper.push(tmp); --i; ++funcBrace; continue ;
 				} else {
 					error = MarkError(infixEq, i) +
@@ -345,7 +358,7 @@ MatrixCalc::MatrixCalc(std::map<std::string, Func> &funcsSrc,
 	baseFuncsReg = { "sin", "cos", "tan", "exp", "sqrt", "abs", "rad",
 					 "acos", "asin", "atan", "ceil", "floor", "cosh",
 					 "log", "logt", "tanh", "deg", "sinh" } ;
-	baseFuncsMatrix = { "inv", "transp", "lonenorm", "ltwonorm", "linfnorm", "det", "adj" };
+	baseFuncsMatrix = { "inv", "transp", "lpnorm", "lonenorm", "ltwonorm", "linfnorm", "det", "adj" };
 	//Set priority for base functions
 	for (std::string var : baseFuncsReg)
 		operPriority[var] = 4;
@@ -442,10 +455,13 @@ std::string MatrixCalc::CalcIt() {
 	}
 	//Generate result value
 	finCalc = nums.top();
+    //If result is complex value
+    if (!finCalc.lst.empty())
+        calcResult = FinResGenerate(finCalc, false);
 	//If result is a regular expression
-	if (finCalc.state == 2) calcResult = finCalc.eq;
+	else if (finCalc.state == 2) calcResult = finCalc.eq;
 	//If result is a matrix
-	if (finCalc.state == 1) calcResult = finCalc.matrix.toString();
+	else if (finCalc.state == 1) calcResult = finCalc.matrix.toString();
 	nums.pop();
 	return calcResult;
 }
@@ -595,8 +611,10 @@ MatrixCalc::value MatrixCalc::ExposeUserDefFunc(const Func &f, const value &var)
 void MatrixCalc::LPnorm() {
 	//Expression calculator
 	RevPolNotation pol(funcs);
+    //Lpnorm function search iterator
+    int begin = 0;
 
-	while (infixEq.find("lpnorm") != std::string::npos) {
+	while (infixEq.find("lpnorm", begin) != std::string::npos) {
 		//position iterator
 		int pos = infixEq.find("lpnorm") + std::strlen("lpnorm");
 
@@ -608,7 +626,7 @@ void MatrixCalc::LPnorm() {
 		}
 		//start position of inner contains of 'lpnorm'
 		//function
-		int begin = ++pos;
+		begin = ++pos;
 		//number of braces
 		int brace = 1;
 		for ( ; pos < infixEq.size(); ++pos) {
@@ -627,11 +645,12 @@ void MatrixCalc::LPnorm() {
 		//Matrix for calculation
 		Matrix m;
 		//Matrix index parser
-		int mi = begin;
+		//int mi = begin;
 		//Passing whitespaces
-		while (std::isspace(infixEq[mi])) ++mi;
-		//Matrix variable string
-		std::string matVar;
+		//while (std::isspace(infixEq[mi])) ++mi;
+		//Matrix variable and regular variable strings
+		std::string matVar, regVar;
+        LpnormDev(infixEq, matVar, regVar, begin, end);
 		//If we deal with variable, assign to matrix 'm'
 		//If there is no such variable, return error
 		/*while(std::isalpha(infixEq[mi])) matVar.push_back(infixEq[mi++]);
@@ -666,7 +685,11 @@ void MatrixCalc::LPnorm() {
 			m.setMatrix(infixEq.substr(begin, mi + 1 - begin), funcs, matricies);
 			++mi;
 		}*/
-        
+        //Matrix calculator
+        MatrixCalc mc(funcs, matricies, matVar, token);
+        //In case of error return it
+        if (!mc.getError().empty()) { error = mc.getError(); return; }
+        /*
 		//Passing whitespaces and check if there is comma character
 		//and if there is no, return error
 		while (std::isspace(infixEq[mi])) ++mi;
@@ -684,12 +707,18 @@ void MatrixCalc::LPnorm() {
 			return ;
 		}
 		//Let's calculate power value, in case of error
-		//return it
-		matVar = infixEq.substr(pos, end - pos);
-		pol.setInfixExpr(std::move(matVar));
+		//return it*/
+		//matVar = infixEq.substr(pos, end - pos);
+		pol.setInfixExpr(std::move(regVar));
 		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return ; }
-		matVar = pol.CalcIt();
+		regVar = pol.CalcIt();
 		if (!pol.getErrMsg().empty()) { error = pol.getErrMsg(); return ; }
+        //In case of regular expression has token or
+        //matrix part is complex proceed to next lpnorm
+        //function iteration
+        if (regVar.find(token) != std::string::npos || !mc.getFinValue().lst.empty()) {
+            begin = ++end; continue;
+        }
 		//set of matrix values
 		std::vector<std::string> values = m.getValues();
 		//final expression string for calculating
@@ -706,6 +735,26 @@ void MatrixCalc::LPnorm() {
 		//Replace 'lpnorm' function with new calculated value in expression
 		infixEq.replace(infixEq.find("lpnorm"), end - infixEq.find("lpnorm") + 1, expr);
 	}
+}
+
+void MatrixCalc::LpnormDev(const std::string &src, std::string &matEq, std::string &regEq,
+              const int &begin, const int &end) {
+    //round brace and squarebrace counters
+    int b = 0, sb = 0;
+    //midst position
+    int pos;
+
+    for (int i = begin; i < src.size(); ++i) {
+        if (src[i] == '(') ++b;
+        else if (src[i] == ')') --b;
+        else if (src[i] == '[') ++sb;
+        else if (src[i] == ']') --sb;
+        else if (src[i] == ',' && !b && !sb) {
+            pos = i; break ;
+        }
+    }
+    matEq = src.substr(begin, pos - begin);
+    regEq = src.substr(pos, end - pos);
 }
 
 //Return infinite norm
@@ -2280,7 +2329,7 @@ std::string MatrixCalc::FinResGenerate(const value &val, const bool &isError) {
 		//In case of first element just append it to string
 		if (it == val.lst.begin()) {
 			//In case of matrix
-			if (it->state == 1) res.append(it->matrix.getMatrix());
+			if (it->state == 1 && it->eq.empty()) res.append(it->matrix.getMatrix());
 			//In case of regular expression
 			else if (it->state == 2) res.append(it->eq);
 			//In case of operator (function)

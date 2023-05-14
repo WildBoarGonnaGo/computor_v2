@@ -79,6 +79,10 @@ class MatrixCalc {
     value ExposeUserDefFunc(const Func &f, const value &var);
 	//Return norm of p degree
 	void LPnorm();
+    //Get matrix equation string and regular equation string
+    //from source string
+    void LpnormDev(const std::string &src, std::string &matEq, std::string &regEq,
+                   const int &begin, const int &end);
 	//Return infinite norm
 	value LInfNorm(const Matrix &matrix);
 	//Return l1norm value result
