@@ -29,8 +29,8 @@ class MatrixCalc {
 			  const Matrix &m = Matrix(),
 			  const std::list<value> &v = std::list<value>()) :
 			state(s), matrix(m), eq(e), lst(v) { }
+		bool operator==(const value &s);
 	};
-
 	//Set of functions. Reference value
 	std::map<std::string, Func> &funcs;
 	//Set of values. Reference value

@@ -183,13 +183,13 @@ void EquationProc::AddEquation(std::string &&equation) {
                        funcs[entityName].token);
             //In case of error, erase function
             if (!(RetExprError(calc.getError()))) {
-                if (!oldValue.empty()) funcs[entityName] = oldValue;
+                if (!oldValue.empty()) funcs[entityName].equation = oldValue;
                 else funcs.erase(entityName);
                 return ;
             }
             funcs[entityName].equation = calc.CalcIt();
             if (!(RetExprError(calc.getError()))) {
-                if (!oldValue.empty()) funcs[entityName] = oldValue;
+                if (!oldValue.empty()) funcs[entityName].equation = oldValue;
                 else funcs.erase(entityName);
                 return ;
             }
@@ -199,13 +199,13 @@ void EquationProc::AddEquation(std::string &&equation) {
             parser.setToken(funcs[entityName].token);
             parser.setInfixExpr(std::move(sample));
             if (!(RetExprError(parser.getErrMsg()))) {
-                if (!oldValue.empty()) funcs[entityName] = oldValue;
+                if (!oldValue.empty()) funcs[entityName].equation = oldValue;
                 else funcs.erase(entityName);
                 return ;
             }
             funcs[entityName].equation = parser.CalcIt();
             if (!(RetExprError(parser.getErrMsg()))) {
-                if (!oldValue.empty()) funcs[entityName] = oldValue;
+                if (!oldValue.empty()) funcs[entityName].equation = oldValue;
                 else funcs.erase(entityName);
                 return ;
             }
@@ -300,7 +300,7 @@ int EquationProc::EntityDefine(std::string &error, const std::string &src,
 		return RetError(error, "\nerror: function or variable name must consist of alphabetical characters only",
 						i, src);
 	if (src[i] == '(') {
-        oldValue = funcs[res];
+        oldValue = funcs[res].equation;
 		//Let's fix brace position
 		int brace = 0;
 		isfunc = 1;

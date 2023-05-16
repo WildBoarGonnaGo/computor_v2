@@ -10,6 +10,12 @@
 #include <iomanip>
 #include <algorithm>
 
+//Comparing values
+bool MatrixCalc::value::operator==(const value &s) {
+	if (eq != s.eq) return false;
+	else return true;
+}
+
 //Get double number from string
 std::string	MatrixCalc::GetStringNumber(const std::string &str, int &i) {
 	std::string 	res;
@@ -1759,7 +1765,7 @@ void MatrixCalc::CheckAndFixAuxValueToken(value &aux, const value &tok, const bo
         //Let's execute operation
         aux.lst.front() = Execute("*", aux.lst.front(), tok);
         //If there were errors due calculations, return it
-        if (aux.lst.front().state == 4) return aux.lst.front();
+        if (aux.lst.front().state == 4) return ;
         //If result is zero, set it as '0*x', because x can be
         //a matrix
         if (aux.lst.front().eq == "0")
@@ -1776,7 +1782,7 @@ void MatrixCalc::CheckAndFixAuxValueToken(value &aux, const value &tok, const bo
         //Let's execute operation
         aux.lst.back() = Execute("*", aux.lst.back(), tok);
         //If there were errors due calculations, return it
-        if (aux.lst.front().state == 4) return aux.lst.back();
+        if (aux.lst.front().state == 4) return ;
         //If result is zero, set it as '0*x', because x can be
         //a matrix
         if (aux.lst.back().eq == "0")
@@ -2380,7 +2386,7 @@ MatrixCalc::value MatrixCalc::MultiTokenMatrix(const value &f, const value &s) {
         //Computate result value depending of token position
         res = (f.state == 3) ? Execute("*", aux, s) : Execute("*", f, aux);
         //If there were errors due computations, return it
-        if (res.state == 4) return ;
+        if (res.state == 4) return res;
         //Set result state as matrix and return it
         res.state = 1;
         return res;
@@ -3365,9 +3371,14 @@ MatrixCalc::value MatrixCalc::ComplexRegEqAnalyzerSumSub(const std::string &oper
 	//to contents of 's' value of the range [itS, s.lst.end)
 	//If they are not equal return empty value, with regular
 	//expression state
-	if (std::list<value>(itF, f.lst.end()) == std::list<value>(itS, s.lst.end())) {
-		res.state = 2; return res;
+	bool eq;
+	if (std::list<value>(itF, f.lst.end()).size() != std::list<value>(itS, s.lst.end()).size())
+		{ res.state = 2; return res; }
+	for (auto itFC = itF, itSC = itS; itFC != f.lst.end() && itSC != s.lst.end(); ++itSC, ++itFC) {
+		if (itFC->eq != itSC->eq || itFC->matrix.getMatrix() != itSC->matrix.getMatrix()
+				|| itFC->state != itSC->state) { res.state = 2; return res; }
 	}
+
 	//In other cases let's calculate 'numF' and 'numS' values
 	//with common postfix (no matter [itF, f.lst.end) or [itS, s.lst.end))
 	res.lst.push_back(Execute(oper, numF, numS));
@@ -4066,8 +4077,19 @@ MatrixCalc::value MatrixCalc::RegEqAnalyzeSimplifySecondIt(value &src, std::list
             //auxiliary value. Let's assign them
             value pS, mS, primS;
             primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
+            bool eqLst = true;
+            if (primF.lst.size() != primS.lst.size()) eqLst = false;
+            else {
+				for (auto pfIt = primF.lst.begin(), psIt = primS.lst.begin();
+					 pfIt != primF.lst.end() && psIt != primS.lst.end(); ++pfIt, ++psIt) {
+					if (pfIt->eq != psIt->eq || pfIt->matrix.getMatrix() != psIt->matrix.getMatrix()
+							|| pfIt->state != psIt->state) {
+						eqLst = false; break;
+					}
+				}
+            }
             //If base parts are equal, calculate them
-            if (primF.lst == primS.lst) {
+            if (eqLst/*primF.lst == primS.lst*/) {
                 //Clear result list
                 res.lst.clear();
                 //Clear secondary auxiliary list
@@ -4124,8 +4146,19 @@ MatrixCalc::value MatrixCalc::RegEqAnalyzeSimplifySecondIt(value &src, std::list
     //auxiliary value. Let's assign them
     value pS, mS, primS;
     primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
+    bool eqLst = true;
+    if (primF.lst.size() != primS.lst.size()) eqLst = false;
+	else {
+		for (auto pfIt = primF.lst.begin(), psIt = primS.lst.begin();
+			 pfIt != primF.lst.end() && psIt != primS.lst.end(); ++pfIt, ++psIt) {
+				if (pfIt->eq != psIt->eq || pfIt->matrix.getMatrix() != psIt->matrix.getMatrix()
+						|| pfIt->state != psIt->state) {
+					eqLst = false; break;
+			 }
+		}
+	}
     //If base parts are equal, calculate them
-    if (primF.lst == primS.lst) {
+    if (eqLst /*primF.lst == primS.lst*/) {
         //Clear result list
         res.lst.clear();
         //Clear secondary auxiliary list
@@ -4199,8 +4232,20 @@ MatrixCalc::value MatrixCalc::MatrixAnalyzeSimplifySecondIt(value &src, std::lis
             //auxiliary value. Let's assign them
             value pS, mS, primS;
             primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
+            primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
+			bool eqLst = true;
+			if (primF.lst.size() != primS.lst.size()) eqLst = false;
+			else {
+				for (auto pfIt = primF.lst.begin(), psIt = primS.lst.begin();
+					 pfIt != primF.lst.end() && psIt != primS.lst.end(); ++pfIt, ++psIt) {
+					if (pfIt->eq != psIt->eq || pfIt->matrix.getMatrix() != psIt->matrix.getMatrix()
+							|| pfIt->state != psIt->state) {
+						eqLst = false; break;
+					}
+				}
+			}
             //If base parts are equal, calculate them
-            if (primF.lst == primS.lst) {
+            if (eqLst/*primF.lst == primS.lst*/) {
                 //Erase computated values from source list
                 //so they are already used in calculations
                 it = src.lst.erase(opIt, auxIt);
@@ -4233,7 +4278,18 @@ MatrixCalc::value MatrixCalc::MatrixAnalyzeSimplifySecondIt(value &src, std::lis
         value pS, mS, primS;
         primS = AnalyzeForMultiDiv(auxS, mS, pS, state);
         //If base parts are equal, calculate them
-        if (primF.lst == primS.lst) {
+        bool eqLst = true;
+        if (primF.lst.size() != primS.lst.size()) eqLst = false;
+        else {
+			for (auto pfIt = primF.lst.begin(), psIt = primS.lst.begin();
+				 pfIt != primF.lst.end() && psIt != primS.lst.end(); ++pfIt, ++psIt) {
+				if (pfIt->eq != psIt->eq || pfIt->matrix.getMatrix() != psIt->matrix.getMatrix()
+						|| pfIt->state != psIt->state) {
+					eqLst = false; break;
+				}
+			}
+        }
+        if (eqLst/*primF.lst == primS.lst*/) {
             //Erase computated values from source list
             //so they are already used in calculations
             it = src.lst.erase(opIt, auxIt);
@@ -4256,6 +4312,7 @@ MatrixCalc::value MatrixCalc::MatrixAnalyzeSimplifySecondIt(value &src, std::lis
         res.state = state;
         return res;
     }
+    return res;
 }
 
 //Regular equation power raising
