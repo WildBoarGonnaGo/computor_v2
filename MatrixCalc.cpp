@@ -1325,8 +1325,9 @@ MatrixCalc::value MatrixCalc::Execute(const std::string &oper,
         res = ProcessTokenAndMatrix(oper, first, second);
 	}
     //In case of both values are tokens
-    else if (first.state == 3 && second.state == 3)
+    else if (first.state == 3 && second.state == 3) {
         return ProcessBothTokens(oper, first, second);
+    }
 	return res;
 }
 
@@ -1395,6 +1396,8 @@ MatrixCalc::value MatrixCalc::ProcessMatrixAndRegEq(const std::string &oper, con
     }
     //In case of power raising
     else if (oper == "^") res = MatrixPowerRaise(f, s);
+
+	return res;
 }
 
 //Process regular equation and matrix
@@ -1868,6 +1871,7 @@ MatrixCalc::value MatrixCalc::ProcessBothRegEq(const std::string &oper, const va
     //In case of power raising
     else
         res = PowRaiseRegEq(f, s);
+    return res;
 }
 
 //Computating first matrix variable and second token variable
