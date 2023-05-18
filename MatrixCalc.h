@@ -153,6 +153,8 @@ class MatrixCalc {
 	value MatrixNumMulti(const value &f, const value &s);
 	//Matrix power raising. 'f' is a matrix, 's' should be integer number
 	value MatrixPowerRaise(const value &f, const value &s);
+	//Return Unit Matrix
+	value UnitMatrix(const int &row, const int &column);
     //Complex matrix power raise. 'f' is a matrix, 's' should be integer number
     value ComplexMatrixPowerRaise(const value &f, const value &s);
 	//Denomination elements for regular expression

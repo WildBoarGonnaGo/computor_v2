@@ -515,7 +515,7 @@ MatrixCalc::value MatrixCalc::funcExecute(const std::string &oper, const value &
 			res.state = 4; return res;
 		}
         //In case of complex equation
-        if (!var.lst.empty())
+        if (!var.lst.empty() || (search != funcs.end() && search->second.isMatrix))
             return funcExecuteTokenOrComplex(oper, var);
 		//Regular expression calculator
 		RevPolNotation pol(funcs);
@@ -575,8 +575,8 @@ MatrixCalc::value MatrixCalc::funcExecuteTokenOrComplex(const std::string &oper,
 
 //Expose user defined functions
 MatrixCalc::value MatrixCalc::ExposeUserDefFunc(const Func &f, const value &var) {
-    //Result value
-    value res;
+	//Result value
+	value res;
     //number of elements in equation
     int num;
     //equation string
@@ -588,15 +588,17 @@ MatrixCalc::value MatrixCalc::ExposeUserDefFunc(const Func &f, const value &var)
     //it into string and assign it to 'expr'
     //variable, or else just assign it's
     //equation value to our expression string
-    expr = (!var.lst.empty()) ? FinResGenerate(var, false) : var.eq;
-    //Calculate number of elemens in equation
+    expr = (!var.lst.empty()) ? FinResGenerate(var, false) :
+		(var.state == 2) ? var.eq : var.matrix.getMatrix();
+    /*//Calculate number of elemens in equation
     num = DenomElems(expr).size();
     //if number of elements is greater than 1, add brace
     //to the begining and the end of 'forReplace' string
     if (num > 1) {
         expr.insert(0, 1, '(');
         expr.push_back(')');
-    }
+    }*/
+	expr = "(" + expr + ")";
     //search iterator
     size_t s = 0;
     while(true) {
@@ -610,6 +612,10 @@ MatrixCalc::value MatrixCalc::ExposeUserDefFunc(const Func &f, const value &var)
 
     //Matrix expression calculator
     MatrixCalc calc(funcs, matricies, fEq, token);
+	//In case of error return it
+	if (!calc.getError().empty()) { res.state = 4; return res; }
+	//Calculate expression and return it
+	calc.CalcIt();
     return calc.getFinValue();
 }
 
@@ -1850,11 +1856,15 @@ MatrixCalc::value MatrixCalc::ProcessBothRegEq(const std::string &oper, const va
     value res;
     
     //In case of summing or subtraction
-    if (oper == "+" || oper == "-")
+    if (oper == "+")
         res = SumSubRegEq(oper, f, s);
+	else if (oper == "-")
+		res = SumSubRegEq(oper, f, s);
     //In case of multiplication or division
-    if (oper == "*" || oper == "/")
+    else if (oper == "*")
         res = MultiDivRegEq(oper, f, s);
+	else if (oper == "/")
+		res = MultiDivRegEq(oper, f, s);
     //In case of power raising
     else
         res = PowRaiseRegEq(f, s);
@@ -2134,7 +2144,7 @@ MatrixCalc::value MatrixCalc::MatrixNumMulti(const value &f, const value &s) {
 	//Is there is some token in regular expression
 	bool isThereToken = false;
 
-	if (f.eq.find(token) != std::string::npos) isThereToken = true;
+	if (!token.empty() && f.eq.find(token) != std::string::npos) isThereToken = true;
     //In case of reg expression ('f') value is simple and matrix ('s')
     //is complex
 	if (!s.lst.empty() && f.lst.empty()) return MatrixVectorNumMulti(s, f);
@@ -2223,13 +2233,39 @@ MatrixCalc::value MatrixCalc::MatrixPowerRaise(const value &f, const value &s) {
 		res.state = 4; return res;
 	}
 	//Iterator bound
-	int bound = std::stoi(power);
+	long bound = std::stol(power);
+	if (!bound) return UnitMatrix(f.matrix.getColumn(), f.matrix.getRow());
 	res = f;
+	if (bound < 0)
+		res = Inv(res.matrix);
 	//Matrix raising. In case of error, return it
 	for (int i = 1; i < bound; ++i) {
 		res = MatrixMulti(res, f);
 		if (res.state == 4) return res;
 	}
+	return res;
+}
+
+//Return Unit Matrix
+MatrixCalc::value MatrixCalc::UnitMatrix(const int &row, const int &column) {
+	//Result value
+	value res;
+	//vector of values
+	std::vector<std::string> vals;
+
+	for (int i = 0; i < row; ++i) {
+		for (int j = 0; j < column; ++j)
+			vals[i * column + j] = (i == column) ? "1" : "0";
+	}
+	/*
+	 Matrix(const std::vector<std::string> &src,
+			const int &rowSrc, const int &columnSrc,
+			const std::string &tokenSrc = std::string(),
+			const int &tokenIsMatrixSrc = 0);
+	 */
+	res.eq = "";
+	res.matrix = Matrix(vals, row, column, token);
+	res.state = 1;
 	return res;
 }
 

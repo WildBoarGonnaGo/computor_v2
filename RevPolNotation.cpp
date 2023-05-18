@@ -78,8 +78,8 @@ void RevPolNotation::ComplexSumSubtractNum(std::list<std::string> &elems, const 
 	std::list<std::string>::iterator it = elems.begin();
 	std::string finalNum = "0";
 
-	if (!num.compare("0") && num.size() == 1)
-		return ;
+	//if (!num.compare("0") && num.size() == 1)
+	//	return ;
 	while (it != elems.end()) {
 		if ((*it).find_first_not_of("-0123456789.") == std::string::npos) {
 			if (!(*it).compare("-") && (*it).size() == 1) { ++it; continue; }
@@ -97,11 +97,13 @@ void RevPolNotation::ComplexSumSubtractNum(std::list<std::string> &elems, const 
 		++it;
 	}
 	finalNum = RemoveTrailZeros(Execute(oper, finalNum, num));
-	if (finalNum.front() == '-') {
-		elems.push_back("-");
-		finalNum.erase(finalNum.begin());
-	} else elems.push_back("+");
-	elems.push_back(finalNum);
+	if (finalNum != "0") {
+		if (finalNum.front() == '-') {
+			elems.push_back("-");
+			finalNum.erase(finalNum.begin());
+		} else elems.push_back("+");
+		elems.push_back(finalNum);
+	}
 }
 
 void RevPolNotation::StrMultiplySearch(std::string &src, const std::string &token) {
@@ -150,23 +152,32 @@ std::string RevPolNotation::AlphaNum(const std::string &oper, const std::string 
 			errmsg = "error: division by zero is undefined";
 			return "";
 		}
+		if (s == "1") return f;
+		if (s == "0" && oper == "*") return s;
+		else if (s == "0" && (oper == "/" || oper == "%"))
+			return DivError();
 		ComplexMultiDivNum(lst, s, oper);
 		for (std::string elem : lst) strRes += elem + " ";
 		strRes.resize(strRes.size() - 1);
 	}
 	else if (!oper.compare("-") || !oper.compare("+")) {
+		if (s == "0") return f;
 		ComplexSumSubtractNum(lst, s, oper);
 		for (std::string elem : lst) strRes += elem + " ";
 		strRes.resize(strRes.size() - 1);
 	}
 	else if (!oper.compare("^")) {
+		if (s == "0") return "1";
+		if (s == "1") return f;
 		bool brace = (lst.size() != 1);
+		//if (!brace) brace = FindMultiOrDiv(lst.back());
 		std::string f_brace = (s.front() == '-') ? "(" : "";
 		std::string s_brace = (s.front() == '-') ? ")" : "";
-		if (!s.compare("0") && s.size() == 1) strRes = ((brace) ? "(" : "") + f + ((brace) ? ")" : "");
+		if (s == "0") strRes = "1";//strRes = ((brace) ? "(" : "") + f + ((brace) ? ")" : "");
 		else
 			strRes = ((brace) ? "(" : "") + f + ((brace) ? ")" : "") + " " + oper
 					 + " " + f_brace + s + s_brace;
+		if (!brace) strRes = ComplexPowRaise(strRes);
 	}
 	return strRes;
 }
@@ -442,14 +453,18 @@ std::string RevPolNotation::AlphaFinalSumSub(const std::list<std::string> &lst) 
 		fAlpha.clear();
 		fNum.clear();
 		if (expired.find(i) != expired.end()) continue ;
-		fNum = simplePrefixNum(aux[i].substr(0, aux[i].find_first_not_of("-0123456789.")));
+		if (aux[i].find_first_not_of("-0123456789.") != std::string::npos)
+			fNum = simplePrefixNum(aux[i].substr(0, aux[i].find_first_not_of("-0123456789.")));
+		else fNum = aux[i];
 		if (aux[i].find_first_not_of("-0123456789.*") != std::string::npos)
 			fAlpha = aux[i].substr(aux[i].find_first_not_of("-0123456789.* "));
 		for (int j = i + 1; j < aux.size(); ++j) {
 			sAlpha.clear();
 			sNum.clear();
 			if (expired.find(j) != expired.end()) continue ;
-			sNum = simplePrefixNum(aux[j].substr(0, aux[j].find_first_not_of("-0123456789.")));
+			if (aux[j].find_first_not_of("-0123456789.") != std::string::npos)
+				sNum = simplePrefixNum(aux[j].substr(0, aux[j].find_first_not_of("-0123456789.")));
+			else sNum = aux[j];
 			if (aux[j].find_first_not_of("-0123456789.*") != std::string::npos)
 				sAlpha = aux[j].substr(aux[j].find_first_not_of("-0123456789.* "));
 			if (fAlpha.size() == sAlpha.size() && !fAlpha.compare(sAlpha)) {
@@ -465,6 +480,7 @@ std::string RevPolNotation::AlphaFinalSumSub(const std::list<std::string> &lst) 
 		}
 		res += (!fAlpha.empty() ? prefixNum(fNum, " * ") + fAlpha : fNum);
 	}
+	if (res.empty()) res = "0";
 	return res;
 }
 
@@ -498,8 +514,8 @@ std::list<std::string> RevPolNotation::ComplexSubSumAlpha(const std::string &ope
 			if (auto search = indicies.find(i); search != indicies.end()) continue ;
 			//if (!fNum.compare("0") && fNum.size() == 1)
 			sNum = simplePrefixNum((*itS).substr(0, (*itS).find_first_not_of("-0123456789.")));
-			if ((*itS).find_first_not_of("-0123456789. *") != std::string::npos)
-				sAlpha = (*itS).substr((*itS).find_first_not_of("-0123456789. *"));
+			if ((*itS).find_first_not_of("-0123456789. 	*") != std::string::npos)
+				sAlpha = (*itS).substr((*itS).find_first_not_of("-0123456789. 	*"));
 			if (itS != sLst.begin()) {
 				--itS;
 				if ((*itS).size() == 1 && !(*itS).compare("-"))
@@ -514,15 +530,24 @@ std::list<std::string> RevPolNotation::ComplexSubSumAlpha(const std::string &ope
 			++i;
 		}
 		if (fNum.compare("0") || fNum.size() != 1)
-			res.push_back(prefixNum(fNum, " * ") + fAlpha);
+			res.push_back(((!fAlpha.empty()) ? prefixNum(fNum, " * ") : fNum)+ fAlpha);
 	}
 	i = 0;
 	for (std::list<std::string>::const_iterator itS = sLst.begin(); itS != sLst.end(); ++itS) {
-		if ((!(*itS).compare("+") || !(*itS).compare("-")) && (*itS).size() == 1) continue ;
-		if (auto search = indicies.find(i); search != indicies.end()) continue ;
-		sNum = simplePrefixNum((*itS).substr(0, (*itS).find_first_not_of("-0123456789.")));
+		if ((!(*itS).compare("+") || !(*itS).compare("-")) && (*itS).size() == 1) {
+			++i;
+			continue ;
+		}
+		if (auto search = indicies.find(i); search != indicies.end()) {
+			++i;
+			continue ;
+		}
+		if ((*itS).find_first_not_of("-0123456789.") != std::string::npos)
+			sNum = simplePrefixNum((*itS).substr(0, (*itS).find_first_not_of("-0123456789.")));
+		else sNum = *itS;
 		if (sNum.size() == 1 && !sNum.compare("0")) continue ;
-		sAlpha = (*itS).substr((*itS).find_first_not_of("-0123456789. *"));
+		if ((*itS).find_first_not_of("-0123456789. 	*") != std::string::npos)
+			sAlpha = (*itS).substr((*itS).find_first_not_of("-0123456789. 	*"));
 		if (itS != sLst.begin()) {
 			--itS;
 			if ((*itS).size() == 1 && !(*itS).compare("-"))
@@ -530,9 +555,10 @@ std::list<std::string> RevPolNotation::ComplexSubSumAlpha(const std::string &ope
 			++itS;
 		}
 		if (!oper.compare("-")) sNum = RemoveTrailZeros(Execute("*", "-1", sNum));
-		res.push_back(prefixNum(sNum, " * ") + sAlpha);
+		res.push_back(((!sAlpha.empty()) ? prefixNum(sNum, " * ") : sNum) + sAlpha);
 		++i;
 	}
+	if (res.empty()) res.push_back("0");
 	return res;
 }
 
@@ -552,8 +578,84 @@ std::string RevPolNotation::AlphaAlpha(const std::string &oper, const std::strin
 		return res;
 	}
 	res = AlphaFinalSumSub(resLst);
+	//if (DenomElems(res).size() == 1)
+	SeekComplex(res);
 	if (res.empty()) res.push_back('0');
 	return res;
+}
+
+//Seek complex number in equation, and if it's necessary fix it
+void RevPolNotation::SeekComplex(std::string &s) {
+	std::list<std::string> lst;
+	std::string tmp;
+	bool cPow = false;
+	auto it = lst.begin();
+	int br = 0;
+	auto ifDigit = [](const char &c) { return std::isdigit(c); };
+
+	for (char c : s) {
+		if (std::isspace(c) && !br) continue ;
+		if (c == '(') ++br;
+		else if (c == ')') --br;
+		else if (baseOpers.find(c) != std::string::npos/*(c == '*' || c == '/' || c == '^')*/ & !br) {
+			lst.push_back(std::move(tmp));
+			if (lst.size() == 1) it = lst.begin();
+			if (!cPow && /*c != '^' && */lst.size() > 1)
+				++it;
+			if (*it == "i" && c == '^') cPow = true;
+			if (cPow && std::find_if(lst.back().begin(), lst.back().end(), ifDigit) != it->end()) {
+				int tmp = std::stoll(lst.back());
+
+				if (!(std::fmod(tmp, 2))) {
+					*it = Execute("^", *it, lst.back());
+					it = lst.erase(++it); it = lst.erase(it);
+					if (it == lst.end()) it = lst.begin();
+					else --it; cPow = false;
+				} else {
+					bool neg = tmp < 0;
+					lst.back() = ((neg) ? "(" : "") + lst.back() + ((neg) ? ")" : "");
+				}
+			}
+			lst.push_back(std::string(1, c));
+			if (!cPow && /*c != '^' &&*/ lst.size() > 1) ++it;
+			continue ;
+		}
+		tmp.push_back(c);
+	}
+	lst.push_back(std::move(tmp));
+	if (cPow && std::find_if(lst.back().begin(), lst.back().end(), ifDigit) != it->end()) {
+		int tmp = std::stoll(lst.back());
+
+		if (!(std::fmod(tmp, 2))) {
+			*it = Execute("^", *it, lst.back());
+			it = lst.erase(++it); it = lst.erase(it);
+			if (it == lst.end()) it = lst.begin();
+			else --it;
+		}
+		else {
+			bool neg = tmp < 0;
+			lst.back() = ((neg) ? "(" : "") + lst.back() + ((neg) ? ")" : "");
+		}
+	}
+	std::string old = s;
+	s.clear();
+	for (std::string v : lst) {
+		bool isoper = (baseOpers.find(v) != std::string::npos);
+		s.append(((isoper) ? " " : "") + v + ((isoper) ? " " : ""));
+	}
+	if (s != old) {
+		RevPolNotation kek(std::move(s), userDefFuncs);
+		kek.setToken(token);
+		s = kek.CalcIt();
+	}
+	//return s;
+}
+
+//Division error signal
+std::string RevPolNotation::DivError() {
+	calcError = true;
+	errmsg = "error division by zero is undefined";
+	return "";
 }
 
 std::string RevPolNotation::Execute(const std::string &oper, const std::string &f, const std::string &s) {
@@ -561,11 +663,11 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 	long double fNum, sNum, res = 0;
 	bool ifAlphaFirst, ifAlphaSecond;
 	auto ifAlpha = [](const char &c) { return std::isalpha(c); };
-	auto divError = [](bool &errVal, std::string &errmsg) {
+	/*auto divError = [](bool &errVal, std::string &errmsg) {
 		errVal = true;
 		errmsg = "error division by zero is undefined";
 		return "";
-	};
+	};*/
 	//string stream for output
 	std::stringstream oss;
 	//complex number postfix
@@ -587,7 +689,7 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 	else if (!oper.compare("-")) res = fNum - sNum;
 	else if (!oper.compare("*")) res = fNum * sNum;
 	else if (!oper.compare("/")) {
-		if (!sNum) return divError(calcError, errmsg);
+		if (!sNum) return DivError(/*calcError, errmsg*/);
 		res = fNum / sNum;
 	}
 	else if (!oper.compare("^")) {
@@ -604,23 +706,105 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 		res = std::pow(fNum, sNum);
 	}
 	else if (!oper.compare("%")) {
-		if (!sNum) return divError(calcError, errmsg);
+		if (!sNum) return DivError(/*calcError, errmsg*/);
 		res = std::fmod(fNum, sNum);
 	}
-	oss << std::setprecision(10) << res;
+	oss << std::fixed << std::setprecision(10) << res;
 	return oss.str() + postCom;
+}
+
+//Find multiplication or division outside braces in equation
+bool RevPolNotation::FindMultiOrDiv(const std::string &s) {
+	//brace counter
+	int brace = 0;
+
+	for (char c : s) {
+		if (c == '(') ++brace;
+		else if (c == ')') --brace;
+		else if ((c == '*' || c == '/') && !brace)
+			return true;
+	}
+	return false;
+}
+
+//Seeking complex number if power raising value
+std::string RevPolNotation::ComplexPowRaise(const std::string &s) {
+	bool isInBrace = false, calcpow = false;
+	int i = 0, brace = 0;
+	std::string pow, tmp;
+	std::list<std::string> multi;
+	if (s[i] == '(') {
+		isInBrace = true;
+		++i;
+	}
+	auto ifDigit = [](const char &c) { return std::isdigit(c); };
+
+	for (char c : s) {
+		if (c == '(') ++brace;
+		else if (c == ')') {
+			if (isInBrace && !brace) continue;
+			--brace;
+		}
+		else if ((c == '*' || c == '/') && !brace && !calcpow) {
+			tmp = tmp.substr(tmp.find_first_not_of(" 	"), tmp.find_last_not_of(" 	")
+							 - tmp.find_first_not_of(" 	") + 1);
+			multi.insert(multi.end(), { std::move(tmp), std::string(1, c) });
+			continue ;
+		}
+		else if (c == '^' && !brace) {
+			multi.push_back(tmp.substr(tmp.find_first_not_of("	 "), tmp.find_last_not_of(" 	")
+									   - tmp.find_first_not_of(" 	") + 1));
+			calcpow = true; continue;
+		}
+		if (!calcpow) tmp.push_back(c);
+		else if (!std::isspace(c)) {
+			if (c == ')' || c == '(') continue ;
+			pow.push_back(c);
+		}
+	}
+	bool neg = std::stod(pow) < 0;
+	auto num = multi.end();
+	for (auto it = multi.begin(); it != multi.end(); ++it) {
+		bool isnum = false;
+
+		if (*it == "*" || *it == "/") continue ;
+		else if (*it == "i" && !std::fmod(std::stod(pow), 2.0)) {
+			*it = "-1"; isnum = true;
+		}
+		else if (std::find_if(it->begin(), it->end(), ifDigit) != it->end()) {
+			*it = Execute("^", *it, pow); isnum = true;
+		}
+		else *it += std::string(" ^ ") + ((neg) ? "(" : "") + pow + ((neg) ? ")" : "");
+
+		if (num == multi.end() && isnum) num = it;
+		else if (isnum) {
+			tmp = *(--it);
+			it = multi.erase(it);
+			*num = Execute(tmp, *num, *it);
+			it = multi.erase(it);
+			if (it == multi.end()) break;
+			else --it;
+		}
+	}
+	tmp.clear();
+	for (std::string v : multi) {
+		bool isoper = (v == "*" || v == "/");
+		tmp.append(((isoper) ? " " : "") + v + ((isoper) ? " " : ""));
+	}
+	return tmp;
 }
 
 //Private method. It returns exposed func string, if func's
 //operand contains alphabetical character
 std::string RevPolNotation::UDfuncExpose(const Func &src, const std::string &forReplace) {
 	//Equation itself
-	std::string res = src.equation, replace = forReplace;
+	std::string res = src.equation, replace = "(" + forReplace + ")";
 	//Number of elements in equation
 	int num;
 	//Expression calculator
 	RevPolNotation pol(userDefFuncs);
 
+	/*parse = "(" + forReplace + ")";
 	//Calculate number of elemens in equation
 	num = DenomElems(forReplace).size();
 	//if number of elements is greater than 1, add brace
@@ -628,7 +812,8 @@ std::string RevPolNotation::UDfuncExpose(const Func &src, const std::string &for
 	if (num > 1) {
 		replace.insert(0, 1, '(');
 		replace.push_back(')');
-	}
+	}*/
+
 	if (forReplace == src.token) return res;
 	//search iterator
 	size_t s = 0;
@@ -669,15 +854,20 @@ std::string RevPolNotation::funcExecute(const std::string &oper, const std::stri
 	if (!oper.compare("sin")) res = std::sin(std::stold(var));
 	else if (!oper.compare("cos")) res = std::cos(std::stold(var));
 	else if (!oper.compare("tan")) {
-		if (!var.compare("1.570796")) {
+		/*if (!var.compare("1.570796")) {
 			calcError = true;
-			return "error: tan(pi/2) if undefined value";
+			errmsg = "error: tan(pi/2) if undefined value";
 		}
 		if (!var.compare("4.712389")) {
 			calcError = true;
 			return "error: tan(3*pi/2) if undefined value";
-		}
+		}*/
 		res = std::tan(std::stod(var));
+		if (res < -65315780005) {
+			calcError = true;
+			errmsg = "error: tan(pi/2) and tan(3*pi/2) are undefined value";
+			return "";
+		}
 	}
 	else if (!oper.compare("exp")) res = std::exp(std::stold(var));
 	else if (!oper.compare("sqrt")) {
@@ -707,7 +897,7 @@ std::string RevPolNotation::funcExecute(const std::string &oper, const std::stri
 	else if (oper == "sinh") res = std::sinh(std::stold(var));
 
 	//return std::to_string(res);
-	oss << std::setprecision(10) << res;
+	oss << std::fixed << std::setprecision(10) << res;
 	return oss.str() + postCom;
 }
 
@@ -760,7 +950,15 @@ std::string		RevPolNotation::ProcessPostfix() {
 				res.clear(); return res;
 			}
 			brace_str.push_back(inifixExpr[i]);
-			oper.push(brace_str); ++brace;
+			if (funcBrace) {
+				std::string tmp = oper.top();
+				oper.pop();
+				oper.push(brace_str);
+				oper.push(tmp);
+			}
+			else
+			oper.push(brace_str);
+			++brace;
 		}
 		//Check a wrong right brace case
 		else if (inifixExpr[i] == ')' && !brace) {
@@ -831,12 +1029,17 @@ std::string		RevPolNotation::ProcessPostfix() {
 				while (std::isspace(inifixExpr[i])) ++i;
 				//If we got pi number, check operators and operands order
 				if (tmp.size() == 2 && !tmp.compare("pi")) {
+					std::stringstream oss;
 					//Check operation and operands order
+					oss << std::setprecision(15) << M_PI;
 					errmsg = errorRet(number, "\nerror: wrong order: there should be operator or function", res,
-							   std::to_string(M_PI), i);
+							   oss.str(), i);
 					//If error occured, mark place where error occured
 					if (!errmsg.empty()) errmsg.insert(0, markPlace(inifixExpr, i));
 					if (res.empty()) return res;
+					/*else {
+						res += oss.str() + " ";
+					}*/
 					continue ;
 				}
 				//Check if paramater is a token
@@ -861,13 +1064,15 @@ std::string		RevPolNotation::ProcessPostfix() {
 				//is a left brace. If we deal with it, we push function into
 				//operator stack, otherwise we check if we deal with base functions
 				else if (uDSearch != userDefFuncs.end() && inifixExpr[i] == '(') {
-					oper.push(tmp); --i; ++funcBrace; continue;
+					/*oper.push(std::string(1, '('));*/ oper.push(tmp); --i;
+					++funcBrace; continue;
 				}
 				//Check if we deal with some base function and next character
 				//is a left brace. If we deal with it, we push function into
 				//operator stack, otherwise we check if we deal with base functions
 				else if (search != operPriority.end() && inifixExpr[i] == '(') {
-					oper.push(tmp); --i; ++funcBrace; continue ;
+					/*oper.push(std::string(1, '('));*/ oper.push(tmp); --i;
+					++funcBrace; /*++brace;*/ continue;
 				} else {
 					errmsg = markPlace(inifixExpr, i) +
 							"\nerror: there should be open brace after function name";
@@ -887,7 +1092,7 @@ std::string		RevPolNotation::ProcessPostfix() {
 						"\nerror: wrong order there should be a number";
 				res.clear(); return res;
 			}
-			//Заносим в выходную строку все операторы стэка имеющие более высокий приоритет
+			//Push into postfix string all stack operator with higher priority
 			while (!oper.empty() && operPriority[oper.top()] >= operPriority[tmp]) {
 				res += oper.top(); oper.pop(); res.push_back(' ');
 			}
@@ -902,6 +1107,11 @@ std::string		RevPolNotation::ProcessPostfix() {
 		}
 		//Passing whitespaces
 		while (std::isspace(inifixExpr[i + 1])) ++i;
+	}
+	if (brace) {
+		errmsg = markPlace(inifixExpr, inifixExpr.size() - 1) +
+				"\nerror: number of open and close brace should be equal";
+		res.clear(); return res;
 	}
 	//Push the rest into string
 	while (!oper.empty()) {
@@ -987,7 +1197,7 @@ RevPolNotation::RevPolNotation(std::map<std::string, Func> &userDefFuncsRef) : b
 			  "acos", "asin", "atan", "ceil", "floor", "cosh",
 			  "log", "logt", "tanh", "deg", "sinh" };
 	for (std::string var : funcs)
-		operPriority[var] = 4;
+		operPriority[var] = 0;
 }
 
 
@@ -1007,7 +1217,7 @@ RevPolNotation::RevPolNotation(std::string &&init_expr, std::map<std::string, Fu
 			  "acos", "asin", "atan", "ceil", "floor", "cosh",
 			  "log", "logt", "tanh", "deg", "sinh" };
 	for (std::string var : funcs)
-		operPriority[var] = 4;
+		operPriority[var] = 0;
 	if (!token.empty())
 		StrMultiplySearch(inifixExpr, token);
 	StrMultiplySearch(inifixExpr, "i");

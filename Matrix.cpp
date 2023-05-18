@@ -233,7 +233,8 @@ Matrix::Matrix(const std::vector<std::string> &src,
 			output.append(values[valIt++] + ((j == column - 1) ? " " : " , "));
 		}
 		matrix.append(((i == row - 1) ? "] ]": "] ; "));
-		output.append("]\n");
+		output.append("]");
+		if (i != row - 1) output.push_back('\n');
 	}
 }
 
@@ -282,8 +283,9 @@ void Matrix::setMatrix(const std::string &src,
 		output.append("[ ");
 		for (int j = 0; j < column; ++j) {
 			output.append(values[valIt++]);
-			output.append((j == column - 1) ? " ]\n" : " , ");
+			output.append((j == column - 1) ? " ]" : " , ");
 		}
+		if (i != row - 1) output.push_back('\n');
 	}
 }
 

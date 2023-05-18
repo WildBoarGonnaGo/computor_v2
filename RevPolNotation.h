@@ -79,8 +79,16 @@ class RevPolNotation {
 											  const std::list<std::string> &sLst);
 	//Private submethod. It manages case with both alphanumerical variables
 	std::string AlphaAlpha(const std::string &oper, const std::string &f, const std::string &s);
+	//Seek complex number in equation, and if it's necessary fix it
+	void SeekComplex(std::string &s);
+	//Division error signal
+	std::string DivError();
 	//Private method. It executes base operators
 	std::string Execute(const std::string &oper, const std::string &f, const std::string &s);
+	//Find multiplication or division outside braces in equation
+	bool FindMultiOrDiv(const std::string &s);
+	//Seeking complex number if power raising value
+	std::string ComplexPowRaise(const std::string &s);
 	//Private method. It returns exposed func string, if func's
 	//operand contains alphabetical character
 	std::string UDfuncExpose(const Func &src, const std::string &forReplace);
