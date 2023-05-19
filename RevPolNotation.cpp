@@ -304,8 +304,10 @@ std::list<std::string> RevPolNotation::PowLevel(const std::string &src) {
 		if (!tmp.empty())
 			num = tmp.substr(tmp.find_first_not_of(" ^"));
 	} else {
-		alpha = src.substr(0, src.find_first_not_of("-0123456789.* ") + 1);
-		alpha = alpha.substr(0, alpha.find_last_not_of(" ") + 1);
+		int pos = src.find_first_not_of("-0123456789.* ");
+		if (src.find_first_not_of(" ", pos) || src.find(" ", pos) != std::string::npos)
+			alpha = src.substr(0, src.find_first_not_of(" ", pos) + 1);
+		else alpha = src;
 		if (src.find_first_of("^") != std::string::npos) {
 			num = src.substr(src.find_first_of("^") + 1);
 			if (num.find_first_of("(") != std::string::npos)
@@ -512,7 +514,6 @@ std::list<std::string> RevPolNotation::ComplexSubSumAlpha(const std::string &ope
 			sNum.clear();
 			if ((!(*itS).compare("+") || !(*itS).compare("-")) && (*itS).size() == 1) continue ;
 			if (auto search = indicies.find(i); search != indicies.end()) continue ;
-			//if (!fNum.compare("0") && fNum.size() == 1)
 			sNum = simplePrefixNum((*itS).substr(0, (*itS).find_first_not_of("-0123456789.")));
 			if ((*itS).find_first_not_of("-0123456789. 	*") != std::string::npos)
 				sAlpha = (*itS).substr((*itS).find_first_not_of("-0123456789. 	*"));
@@ -573,8 +574,10 @@ std::string RevPolNotation::AlphaAlpha(const std::string &oper, const std::strin
 	else if (!oper.compare("+") || !oper.compare("-"))
 		resLst = ComplexSubSumAlpha(oper, fLst, sLst);
 	else {
-		res += ((f.front() == '(') ? "" : "(") + f + ((f.back() == ')') ? "" : ")")
-			   + " ^ " + ((s.front() == '(') ? "" : "(") + s + ((s.back() == ')') ? "" : ")");
+		bool fBr = fLst.size() != 1 || FindMultiOrDiv(fLst.back());
+		bool sBr = sLst.size() != 1 || FindMultiOrDiv(sLst.back());
+		res += ((!fBr) ? "" : "(") + f + ((!fBr) ? "" : ")")
+			   + " ^ " + ((!sBr) ? "" : "(") + s + ((!sBr) ? "" : ")");
 		return res;
 	}
 	res = AlphaFinalSumSub(resLst);
@@ -663,11 +666,6 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 	long double fNum, sNum, res = 0;
 	bool ifAlphaFirst, ifAlphaSecond;
 	auto ifAlpha = [](const char &c) { return std::isalpha(c); };
-	/*auto divError = [](bool &errVal, std::string &errmsg) {
-		errVal = true;
-		errmsg = "error division by zero is undefined";
-		return "";
-	};*/
 	//string stream for output
 	std::stringstream oss;
 	//complex number postfix
@@ -689,7 +687,7 @@ std::string RevPolNotation::Execute(const std::string &oper, const std::string &
 	else if (!oper.compare("-")) res = fNum - sNum;
 	else if (!oper.compare("*")) res = fNum * sNum;
 	else if (!oper.compare("/")) {
-		if (!sNum) return DivError(/*calcError, errmsg*/);
+		if (!sNum) return DivError();
 		res = fNum / sNum;
 	}
 	else if (!oper.compare("^")) {
@@ -804,16 +802,6 @@ std::string RevPolNotation::UDfuncExpose(const Func &src, const std::string &for
 	//Expression calculator
 	RevPolNotation pol(userDefFuncs);
 
-	/*parse = "(" + forReplace + ")";
-	//Calculate number of elemens in equation
-	num = DenomElems(forReplace).size();
-	//if number of elements is greater than 1, add brace
-	//to the begining and the end of 'forReplace' string
-	if (num > 1) {
-		replace.insert(0, 1, '(');
-		replace.push_back(')');
-	}*/
-
 	if (forReplace == src.token) return res;
 	//search iterator
 	size_t s = 0;
@@ -828,7 +816,9 @@ std::string RevPolNotation::UDfuncExpose(const Func &src, const std::string &for
 	//Let's calculate 'res' string
 	pol.setToken(token);
 	pol.setInfixExpr(std::move(res));
-	return pol.CalcIt();
+	res = pol.CalcIt();
+	if (!pol.getErrMsg().empty()) calcError = true;
+	return (pol.getErrMsg().empty()) ? res : pol.getErrMsg();
 }
 
 //Private method. It executes base and user defined functions
@@ -849,19 +839,15 @@ std::string RevPolNotation::funcExecute(const std::string &oper, const std::stri
 
 	if (search != userDefFuncs.end()) {
 		std::string calc = UDfuncExpose(search->second, var);
+		if (calcError) {
+			errmsg = calc;
+			return "";
+		}
 		return RevPolNotation(std::move(calc), userDefFuncs).CalcIt();
 	}
 	if (!oper.compare("sin")) res = std::sin(std::stold(var));
 	else if (!oper.compare("cos")) res = std::cos(std::stold(var));
 	else if (!oper.compare("tan")) {
-		/*if (!var.compare("1.570796")) {
-			calcError = true;
-			errmsg = "error: tan(pi/2) if undefined value";
-		}
-		if (!var.compare("4.712389")) {
-			calcError = true;
-			return "error: tan(3*pi/2) if undefined value";
-		}*/
 		res = std::tan(std::stod(var));
 		if (res < -65315780005) {
 			calcError = true;
@@ -884,14 +870,46 @@ std::string RevPolNotation::funcExecute(const std::string &oper, const std::stri
 
 	else if (!oper.compare("abs")) res = std::abs(std::stold(var));
 	else if (oper == "rad") res = ToRadians(std::stold(var));
-	else if (oper == "acos") res = std::acos(std::stold(var));
-	else if (oper == "asin") res = std::asin(std::stold(var));
+	else if (oper == "acos") {
+		res = std::stold(var);
+		if (res < -1 || res > 1) {
+			calcError = true;
+			errmsg = "error: acos: number range should be between -1 and 1: " + var;
+			return "";
+		}
+		res = std::acos(res);
+	}
+	else if (oper == "asin") {
+		res = std::stold(var);
+		if (res < -1 || res > 1) {
+			calcError = true;
+			errmsg = "error: asin: number range should be between -1 and 1: " + var;
+			return "";
+		}
+		res = std::asin(res);
+	}
 	else if (oper == "atan") res = std::atan(std::stold(var));
 	else if (oper == "ceil") res = std::ceil(std::stold(var));
 	else if (oper == "floor") res = std::floor(std::stold(var));
 	else if (oper == "cosh") res = std::asin(std::stold(var));
-	else if (oper == "log") res = std::log(std::stold(var));
-	else if (oper == "logt") res = std::log10(std::stold(var));
+	else if (oper == "log") {
+		res = std::stold(var);
+		if (res <= 0) {
+			calcError = true;
+			errmsg = "error: log: logarithm of negative number and zero is not supported: " + var;
+			return "";
+		}
+		res = std::log(res);
+	}
+	else if (oper == "logt") {
+		res = std::stold(var);
+		if (res <= 0) {
+			calcError = true;
+			errmsg = "error: logt(log10): logarithm of negative number and zero is not supported : " + var;
+			return "";
+		}
+		res = std::log10(res);
+	}
 	else if (oper == "tanh") res = std::tanh(std::stold(var));
 	else if (oper == "deg") res = ToDegrees(std::stold(var));
 	else if (oper == "sinh") res = std::sinh(std::stold(var));
@@ -941,6 +959,7 @@ std::string		RevPolNotation::ProcessPostfix() {
 		}
 		//if character is a left braced
 		else if (inifixExpr[i] == '(') {
+			++brace;
 			//Push it into stack and announcing about a left brace
 			std::string brace_str;
 			//If there is nothing between left and right braces
@@ -950,7 +969,7 @@ std::string		RevPolNotation::ProcessPostfix() {
 				res.clear(); return res;
 			}
 			brace_str.push_back(inifixExpr[i]);
-			if (funcBrace) {
+			if (funcBrace == brace && funcBrace) {
 				std::string tmp = oper.top();
 				oper.pop();
 				oper.push(brace_str);
@@ -958,7 +977,6 @@ std::string		RevPolNotation::ProcessPostfix() {
 			}
 			else
 			oper.push(brace_str);
-			++brace;
 		}
 		//Check a wrong right brace case
 		else if (inifixExpr[i] == ')' && !brace) {
@@ -1064,15 +1082,15 @@ std::string		RevPolNotation::ProcessPostfix() {
 				//is a left brace. If we deal with it, we push function into
 				//operator stack, otherwise we check if we deal with base functions
 				else if (uDSearch != userDefFuncs.end() && inifixExpr[i] == '(') {
-					/*oper.push(std::string(1, '('));*/ oper.push(tmp); --i;
-					++funcBrace; continue;
+					oper.push(tmp); --i;
+					funcBrace = brace + 1; continue;
 				}
 				//Check if we deal with some base function and next character
 				//is a left brace. If we deal with it, we push function into
 				//operator stack, otherwise we check if we deal with base functions
 				else if (search != operPriority.end() && inifixExpr[i] == '(') {
-					/*oper.push(std::string(1, '('));*/ oper.push(tmp); --i;
-					++funcBrace; /*++brace;*/ continue;
+					oper.push(tmp); --i;
+					funcBrace = brace + 1; continue;
 				} else {
 					errmsg = markPlace(inifixExpr, i) +
 							"\nerror: there should be open brace after function name";

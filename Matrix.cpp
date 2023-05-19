@@ -57,11 +57,7 @@ int Matrix::Parse() {
 					//If it doesn't, return error
 					if (pol.getPosfixExpr().empty())
 						RetError("\nerror: there is no information whatsoever", i, matrix);
-					//--brace;
 					++rowElems;
-					//If there was no elements in a row, return error
-					//if (!rowElems)
-					//	return RetError("\nerror: there is no elements in a row", i, matrix);
 					//If it's first row set number of columns
 					if (!columnCalc) {
 						column = rowElems;
@@ -81,7 +77,6 @@ int Matrix::Parse() {
 					values.push_back(aux);
 					break ;
 				}
-				//aux = matrix.substr(prev, i);
 				//Parse number
 				pol.setInfixExpr(matrix.substr(prev, i - prev));
 				//Check is string contain any information
@@ -96,8 +91,6 @@ int Matrix::Parse() {
 				if (!pol.getErrMsg().empty())
 					{ error = pol.getErrMsg(); return 0; }
 				values.push_back(aux);
-				//Pass whitespaces
-				//while (std::isspace(matrix[i])) ++i;
 				//Check if it's comma. If it's not, return error
 				++i;
 				++rowElems;
