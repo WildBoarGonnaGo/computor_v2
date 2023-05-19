@@ -600,7 +600,7 @@ void RevPolNotation::SeekComplex(std::string &s) {
 		if (std::isspace(c) && !br) continue ;
 		if (c == '(') ++br;
 		else if (c == ')') --br;
-		else if (baseOpers.find(c) != std::string::npos/*(c == '*' || c == '/' || c == '^')*/ & !br) {
+		else if (baseOpers.find(c) != std::string::npos && !br) {
 			lst.push_back(std::move(tmp));
 			if (lst.size() == 1) it = lst.begin();
 			if (!cPow && /*c != '^' && */lst.size() > 1)

@@ -80,7 +80,7 @@ void EquationProc::AddEquation(std::string &&equation) {
 			sample = calc.CalcIt();
 			if (!(RetExprError(calc.getError()))) return ;
 			else {
-				history.push_back(calc.getCalcResult());
+				history.push_back(sample);
 				std::cout << history.back() << std::endl;
 			}
 			return ;
@@ -190,6 +190,10 @@ void EquationProc::AddEquation(std::string &&equation) {
 
 			return ;
 		}
+		if (matricies.find(entityName) != matricies.end())
+			matricies.erase(entityName);
+		if (funcs.find(entityName) != funcs.end())
+			funcs.erase(entityName);
 		history.push_back(vars[entityName]);
 		std::cout << history.back() << std::endl;
 	}
@@ -228,6 +232,10 @@ void EquationProc::AddEquation(std::string &&equation) {
                 return ;
             }
         }
+		if (matricies.find(entityName) != matricies.end())
+			matricies.erase(entityName);
+		if (vars.find(entityName) != vars.end())
+			vars.erase(entityName);
 		history.push_back(funcs[entityName].equation);
 		std::cout << history.back() << std::endl;
 	}
@@ -267,6 +275,10 @@ void EquationProc::AddEquation(std::string &&equation) {
 			matricies[entityName] = calc.getFinValue().matrix;
 			history.push_back(matricies[entityName].toString());
 		}
+		if (funcs.find(entityName) != funcs.end())
+			funcs.erase(entityName);
+		if (vars.find(entityName) != vars.end())
+			vars.erase(entityName);
 		std::cout << history.back() << std::endl;
 	}
 }

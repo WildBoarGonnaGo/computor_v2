@@ -2024,8 +2024,10 @@ MatrixCalc::value MatrixCalc::MatrixPowerRaise(const value &f, const value &s) {
 	long bound = std::stol(power);
 	if (!bound) return UnitMatrix(f.matrix.getColumn(), f.matrix.getRow());
 	res = f;
-	if (bound < 0)
+	if (bound < 0) {
 		res = Inv(res.matrix);
+		bound *= -1;
+	}
 	//Matrix raising. In case of error, return it
 	for (int i = 1; i < bound; ++i) {
 		res = MatrixMulti(res, f);
@@ -2158,7 +2160,7 @@ std::string MatrixCalc::FinResGenerate(const value &val, const bool &isError) {
 			//In case of operator (function)
 			else if (!it->state) res.append(it->eq);
 			//In case of brace
-			else if (it->state == 5) res.append(it->eq);*/
+			else if (it->state == 5) res.append(it->eq);
 			else res.append(it->eq);
 		}
 		//In other cases parse looking forward operations

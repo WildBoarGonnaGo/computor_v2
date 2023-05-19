@@ -1,0 +1,473 @@
+//Base tests
+
+>> x == 2
+error: equation must have only one equal sign
+>> x = 23edd23-+-+
+x = 23edd23-+-+
+        ^
+error: there is no such variable: edd
+>> = 2
+= 2
+^
+error: no name for function or variable is defined
+>> 3 = 4
+3 = 4
+^
+error: function or variable name must consist of alphabetical characters only
+>> x = g
+x = g
+    ^
+error: there is no such variable: g
+>> f(x = 2
+f(x = 2
+ ^
+error: there is no right brace for function token
+>> x = [[4,2]
+[[4,2]
+     ^
+error: wrong matrix syntax
+>> x = --2
+--2
+^
+error: wrong order there should be a number
+>> f(x) = x * 2
+2 * x
+>> t = f(x)
+t = f(x)
+      ^
+error: there is no such variable: x
+>> i = 2
+i = 2
+^
+error: function or variables name can't be 'i', it's complex number
+>> x = 2
+2
+>> y = 4i
+4 * i
+>> z = [[2,3];[3,5]]
+[ 2 , 3 ]
+[ 3 , 5 ]
+>> y = x
+2
+>> y = x * [[4,2]]
+[ 8 , 4 ]
+>> f(z) = z * y
+z * [ [ 8, 4 ] ]
+>> 2 + 2 = ?
+4
+>> 3 * 4 = ?
+12
+>> variables
+>> f(i) = ?
+[ 8 * i , 4 * i ]
+>> x + 2 = ?
+4
+>> 2 / 0 = ?
+error division by zero is undefined
+>> 1.5 + 1 = ?
+2.5
+>> x = 2i
+2 * i
+>> x^2 = ?
+-4
+>> A = [[2,3];[3,4]]
+[ 2 , 3 ]
+[ 3 , 4 ]
+>> B = [[1,0];[0,1]]
+[ 1 , 0 ]
+[ 0 , 1 ]
+>> A * B = ?
+[ 2 , 3 ]
+[ 3 , 4 ]
+>> g(x) = x + 2
+x + 2
+>> p = 4
+4
+>> g(p) = ?
+6
+>> 4 -3 - (2 * 3)^2 * (2-4) + 4
+error: equation must have only one equal sign
+>> 4 -3 - (2 * 3)^2 * (2-4) + 4 = ?
+77
+>> h(x) = 2 * (x + 3 * (x - 4))
+8 * x - 24
+>> h(3) - h(p) + 2 = ?
+-6
+>> h(3)
+error: equation must have only one equal sign
+>> p = 2
+2
+>> h(3) - h(p) + 2 = ?
+10
+>> hol(x) = 2 * x * i
+2 * x * i
+>> hol(2) = ?
+4 * i
+>> hol(i) = ?
+-2
+>> hol(i ^ 2) = ?
+-2 * i
+
+
+	//Additional tests
+	RevPolTest("1 + 2", 1);
+	RevPolTest("1 + 2 - 3", 2);
+	RevPolTest("1 * 2 / 3", 3);
+	RevPolTest("1 + 2 * 3", 4);
+	RevPolTest("1 * 2 + 3", 5);
+	RevPolTest("1 * (2 + 3)", 6);
+	RevPolTest("(1 + 2) * (3 - 4)", 7);
+	RevPolTest("((1 + 2) * 3) - 4", 8);
+	RevPolTest("1 + 2 * (3 - 4 / (5 + 6))", 9);
+	RevPolTest("-2.345 + 6.876", 10);
+	RevPolTest("15/(7-(1+1))*3-(2+(1+1))*15/(7-(200+1))*3", 11);
+	RevPolTest("15/(7-(1+1))*3-(2+(1+1))*15/(7-(200+1))*3-(2+(1+1))", 12);
+	RevPolTest("15/(7-(1+1))*3-(2+(1+1))*15/(7-(200+1))*3-(2+(1+1))+15/(7-(1+1))*3", 13);
+	RevPolTest("15/(7-(1+1))*3-(2+(1+1))*15/(7-(200+1))*3-(2+(1+1))*(15/(7-(1+1))*3-(2+(1+1))+15/(7-(1+1))*3-(2+(1+1)))", 14);
+	RevPolTest("pi", 15);
+	RevPolTest("sin(pi)", 16);
+	RevPolTest("sin(pi / 2)", 17);
+	RevPolTest("1 + 2 * sin(pi / 2) + 3 * sqrt(3^2 + 4^2) + cos(pi) + 5", 18);
+	RevPolTest("i", 19);
+	RevPolTest("2 * i + i * (3 * (3 + 2)) + 1 + 9 * 11 + 12 * 24^2", 20);
+	RevPolTest("i * i", 21);
+	RevPolTest("i ^ 2 * i ^ 2", 22);
+	RevPolTest("i ^ (-1) * i", 23);
+	RevPolTest("i / i", 24);
+	RevPolTest("5 * i ^ 3 / (2 * i)", 25);
+	RevPolTest("5 * i ^ 3 / 2 * i", 26);
+	RevPolTest("(i + 1) * (i + 1)", 27);
+	RevPolTest("(i + 1) * (i + 1)", 28);
+	RevPolTest("(i - 1) * (i + 1)", 29);
+	RevPolTest("(i + 1) ^ 2 * (i + 1)", 30);
+	RevPolTest("(i + 1) * (i + 1) * (i + 1)", 31);
+	RevPolTest("sin(i) + sin(i) + i ^ 2 + i ^ 2", 32);
+	RevPolTest("sin(i) - sin(i) + i ^ 2 + i ^ 2", 33);
+	RevPolTest("1 / 0", 34);
+	RevPolTest("tan(pi/2)", 35);
+	RevPolTest("tan(3 * pi / 2)", 36);
+	RevPolTest("tan(3pi/2) + 5i + 7", 37);
+	RevPolTest("tan(3pi/4) + 5i + 7", 38);
+	RevPolTest("5%4", 39);
+	RevPolTest("-5%4", 40);
+	RevPolTest("2 + 4 *2 - 5 %4 + 2 * (4 + 5)", 41);
+	RevPolTest("4 % 2", 42);
+	RevPolTest("sin(pi)cos(pi)", 43);
+	RevPolTest("sin()cos()", 44);
+	RevPolTest("sin(-)", 45);
+
+	//Testing equation proc class
+	EquationProc proc;
+	//Testing variable declaration functionality
+	proc.AddEquation("> varA = 2");
+	proc.AddEquation("> varB = 4.242");
+	proc.AddEquation("> varC = -4.3");
+	proc.AddEquation("> varA = 2*i + 3");
+	proc.AddEquation("> varB = -4i - 4");
+	proc.AddEquation("> x = 2");
+	proc.AddEquation("> y = x");
+	proc.AddEquation("> varA = 2 + 4 *2 - 5 %4 + 2 * (4 + 5)");
+	proc.AddEquation("> varB = 2 * varA - 5 %4");
+	proc.AddEquation("> varC = 2 * varA - varB");
+
+	//Testing function declaration functionality
+	proc.AddEquation("> funA(x) = 2*x^5 + 4x^2 - 5*x + 4");
+	proc.AddEquation("> funB(y) = 43 * y / (4 % 2 * y)");
+	proc.AddEquation("> funC(z) = -2 * z - 5");
+	proc.AddEquation("> a = 2 * 4 + 4");
+	proc.AddEquation("> funA(x) = 2 * 4 + x");
+	proc.AddEquation("> funB(x) = 4 -5 + (x + 2)^2 - 4");
+	proc.AddEquation("> funC(x) = 4x + 5 - 2");
+
+	//Testing computational part of program
+	proc.AddEquation("> a + 2 = ?");
+	proc.AddEquation("> funA(2) + funB(4) = ?");
+	proc.AddEquation("> funC(3) = ?");
+
+	//Testing variables with functions
+	proc.AddEquation("> varD = funA(varC)");
+
+	//Testing binary equation
+	proc.AddEquation("> funA(x) = x^2 + 2x + 1");
+	proc.AddEquation("> y = 0");
+	proc.AddEquation("> funA(z) = y ?");
+
+	//Testing matrix equations
+	proc.AddEquation("> varA = [[2,3];[4,3]]");
+	proc.AddEquation("> varE = [ [ 3 , 4 ] ]");
+	proc.AddEquation("> varF = []");
+	proc.AddEquation("> varF = [[[[[");
+	proc.AddEquation("> varF = ]]]]]");
+	proc.AddEquation("> varF = [ [ 3 , 4 ] [ 5 ]]");
+	proc.AddEquation("> varF = [ [ 3 , 4 ]    ; [ 5 ]]");
+	proc.AddEquation("> varF = [ [ -1, -2, 1 ] ; [ 5, 9, -8 ]] + [[10,-25,98];[3,0,-14]]");
+	proc.AddEquation("> varG = [ [ -1, -2, 1 ] ; [ 5, 9, -8 ]]");
+	proc.AddEquation("> varH = [[10,-25,98];[3,0,-14]]");
+	proc.AddEquation("> varI = varG - varH");
+	proc.AddEquation("> varJ = [[-1, -2, 7] ; [4, 9, 0]]");
+	proc.AddEquation("> 3 * varJ = ?");
+	proc.AddEquation("> -5 * varJ = ?");
+	proc.AddEquation("> -varJ = ?");
+	proc.AddEquation("> varK = [[-1, 2, -3, 0];[5,4,-2,1];[-8,11,-10,-5]]");
+	proc.AddEquation("> varL = [[-9,3];[6,20];[7,0];[12,-4]]");
+	proc.AddEquation("> varK * varL = ?");
+	proc.AddEquation("> [[6,3];[-17,-2]] * [[4,9];[-6,90]] = ?");
+	proc.AddEquation("> transp([[-1,2,4,0,7];[3,-5,24,9,-3];[-10,-8,-2,-4,11]]) = ?");
+	proc.AddEquation("> [[1,2];[-1,-3]] ^ 2 = ?");
+	proc.AddEquation("> [[1,2];[-1,-3]] ^ 6 = ?");
+	proc.AddEquation("> varJ = [[1, 0, -1, 2];[3,-2,5,0];[-1,4,-3,6]]");
+	proc.AddEquation("> varK = [[-9,1,0];[2,-1,4];[0,-2,3];[1,5,0]]");
+	proc.AddEquation("> varL = [[-5, -20, 13];[10,12,9];[3,-15,8]]");
+	proc.AddEquation("> 2 * varJ * varK - 3 * transp(varL) + 7 * [[1,0,0];[0,1,0];[0,0,1]] = ?");
+	proc.AddEquation("> varM = lonenorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]])");
+	proc.AddEquation("> varM = ltwonorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]])");
+	proc.AddEquation("> varM = det(varL)");
+	proc.AddEquation("> inv(varL) = ?");
+
+>> y(x) = 2 * x
+2 * x
+>> variables
+>> y = 2
+2
+>> variables
+>> y = [[2,3];[3,4]]
+[ 2 , 3 ]
+[ 3 , 4 ]
+>> variables
+>> varA = [[2,3];[4,3]]
+[ 2 , 3 ]
+[ 4 , 3 ]
+>> variables
+>> y = 2
+2
+>> variables
+>> varE = [ [ 3 , 4 ] ]
+[ 3 , 4 ]
+>> varF = []
+[]
+^
+error: there is no information in matrix whatsoever
+>> varF = [[[[[[
+[[[[[[
+  ^
+error: wrong matrix syntax
+>> varF = ]]]]]
+]]]]]
+^
+error: wrong matrix syntax
+>> varF = [ [ 3 , 4 ] [ 5 ]]
+[ [ 3 , 4 ] [ 5 ]]
+           ^
+error: there should be semicolon or right squarebrace
+>> varF = [ [ 3 , 4 ]    ; [ 5 ]]
+[ [ 3 , 4 ]    ; [ 5 ]]
+                    ^
+error: number of columns are not the same in current matrix
+>> varF = [ [ -1, -2, 1 ] ; [ 5, 9, -8 ]] + [[10,-25,98];[3,0,-14]]
+[ 9 , -27 , 99 ]
+[ 8 , 9 , -22 ]
+>> varG = [ [ -1, -2, 1 ] ; [ 5, 9, -8 ]]
+[ -1 , -2 , 1 ]
+[ 5 , 9 , -8 ]
+>> varH = [[10,-25,98];[3,0,-14]]
+[ 10 , -25 , 98 ]
+[ 3 , 0 , -14 ]
+>> varI = varG - varH
+[ -11 , 23 , -97 ]
+[ 2 , 9 , 6 ]
+>> varJ = [[-1, -2, 7] ; [4, 9, 0]]
+[ -1 , -2 , 7 ]
+[ 4 , 9 , 0 ]
+>> 3 * varJ
+error: equation must have only one equal sign
+>> 3 * varJ = ?
+[ -3 , -6 , 21 ]
+[ 12 , 27 , 0 ]
+>> -5 * varJ = ?
+[ 5 , 10 , -35 ]
+[ -20 , -45 , -0 ]
+>> -varJ = ?
+[ 1 , 2 , -7 ]
+[ -4 , -9 , -0 ]
+>> varK = [[-1, 2, -3, 0];[5,4,-2,1];[-8,11,-10,-5]]
+[ -1 , 2 , -3 , 0 ]
+[ 5 , 4 , -2 , 1 ]
+[ -8 , 11 , -10 , -5 ]
+>> varL = [[-9,3];[6,20];[7,0];[12,-4]]
+[ -9 , 3 ]
+[ 6 , 20 ]
+[ 7 , 0 ]
+[ 12 , -4 ]
+>> varK * varL
+error: equation must have only one equal sign
+>> varK * varL = ?
+[ 0 , 37 ]
+[ -23 , 91 ]
+[ 8 , 216 ]
+>> [[6,3];[-17,-2]] * [[4,9];[-6,90]] = ?
+[ 6 , 324 ]
+[ -56 , -333 ]
+>> transp([[-1,2,4,0,7];[3,-5,24,9,-3];[-10,-8,-2,-4,11]]) = ?
+[ -1 , 3 , -10 ]
+[ 2 , -5 , -8 ]
+[ 4 , 24 , -2 ]
+[ 0 , 9 , -4 ]
+[ 7 , -3 , 11 ]
+>> [[1,2];[-1,-3]] ^ 2 = ?
+[ -1 , -4 ]
+[ 2 , 7 ]
+>> [[1,2];[-1,-3]] ^ 6 = ?
+[ -41 , -140 ]
+[ 70 , 239 ]
+>> varJ = [[1, 0, -1, 2];[3,-2,5,0];[-1,4,-3,6]]
+[ 1 , 0 , -1 , 2 ]
+[ 3 , -2 , 5 , 0 ]
+[ -1 , 4 , -3 , 6 ]
+>> varK = [[-9,1,0];[2,-1,4];[0,-2,3];[1,5,0]]
+[ -9 , 1 , 0 ]
+[ 2 , -1 , 4 ]
+[ 0 , -2 , 3 ]
+[ 1 , 5 , 0 ]
+>> varL = [[-5, -20, 13];[10,12,9];[3,-15,8]]
+[ -5 , -20 , 13 ]
+[ 10 , 12 , 9 ]
+[ 3 , -15 , 8 ]
+>> 2 * varJ * varK - 3 * transp(varL) + 7 * [[1,0,0];[0,1,0];[0,0,1]] = ?
+[ 8 , -4 , -15 ]
+[ -2 , -39 , 59 ]
+[ 7 , 35 , -3 ]
+>> varM = lonenorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]])
+28
+>> variables
+>> varM = lonenorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]])
+28
+>> varM = lpnorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]], 1)
+28
+>> ltwonorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]])
+error: equation must have only one equal sign
+>> ltwonorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]]) = ?
+10.295630141
+>> lpnorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]], 2) = ?
+10.295630141
+>> varM = det(varL)
+-2513
+>> inv(varL) = ?
+[ -0.0919220148 , 0.013927578 , 0.1337047488 ]
+[ 0.0210903324 , 0.0314365332 , -0.06963789 ]
+[ 0.0740151288 , 0.053720658 , -0.055710312 ]
+>> lpnorm([[1,0,-1,2,3,2,5,0,-1,4,-3,6]], 4) = ?
+6.9802371636
+
+> f(x) = 2 * abs(x) ^ 3
+2 * abs(x) ^ 3
+> f(-2) + f(-3) = ?
+70
+> plot(f(x))
+> acos(1) = ?
+0
+> acos(-1) = ?
+3.1415926536
+> kek(y) = cos(acos(y))
+cos(acos(y))
+> kek(-1) = ?
+-1
+> sin(acos(0)) = ?
+1
+> sin(deg(90)) = ?
+1
+> kek(-2) = ?
+error: acos: number range should be between -1 and 1: -2
+> asin(2) = ?
+error: asin: number range should be between -1 and 1: 2
+> asin(-2) = ?
+error: asin: number range should be between -1 and 1: -2
+> plot(kek(y))
+error: acos: number range should be between -1 and 1: 2
+> plot(kek(x))
+> plot(sin(acos(x))
+error: there is no right square brace for plot function
+> plot(sin(acos(x)))
+> cf(x) = (floor(x) + floor(x)) ^ ceil(x)
+(2 * floor(x)) ^ ceil(x)
+> cf(1.5) = ?
+4
+> plot(cf(x))
+> variables
+
+Variables:
+y = 2
+
+Matricies:
+varA:
+[ 2 , 3 ]
+[ 4 , 3 ]
+varE:
+[ 3 , 4 ]
+varF:
+[ 9 , -27 , 99 ]
+[ 8 , 9 , -22 ]
+varG:
+[ -1 , -2 , 1 ]
+[ 5 , 9 , -8 ]
+varH:
+[ 10 , -25 , 98 ]
+[ 3 , 0 , -14 ]
+varI:
+[ -11 , 23 , -97 ]
+[ 2 , 9 , 6 ]
+varJ:
+[ 1 , 0 , -1 , 2 ]
+[ 3 , -2 , 5 , 0 ]
+[ -1 , 4 , -3 , 6 ]
+varK:
+[ -9 , 1 , 0 ]
+[ 2 , -1 , 4 ]
+[ 0 , -2 , 3 ]
+[ 1 , 5 , 0 ]
+varL:
+[ -5 , -20 , 13 ]
+[ 10 , 12 , 9 ]
+[ 3 , -15 , 8 ]
+
+Functions:
+cf(x) = (2 * floor(x)) ^ ceil(x)
+f(x) = 2 * abs(x) ^ 3
+kek(y) = cos(acos(y))
+
+> f(x) = logt(x) + logt(x) * sinh(x)
+logt(x) + logt(x) * sinh(x)
+> g(x) = logt(x) + logt(x) * logt(x)
+logt(x) + logt(x) ^ 2
+> g(x) = logt(x) + logt(10) * logt(x)
+2 * logt(x)
+> plot(g(x))
+> plot(f(x))
+> plot(g(x) + f(x))
+
+> varL = [[-5, -20, 13];[10,12,9];[3,-15,8]]
+[ -5 , -20 , 13 ]
+[ 10 , 12 , 9 ]
+[ 3 , -15 , 8 ]
+> varL ^ -1 = ?
+[ -0.0919220148 , 0.013927578 , 0.1337047488 ]
+[ 0.0210903324 , 0.0314365332 , -0.06963789 ]
+[ 0.0740151288 , 0.053720658 , -0.055710312 ]
+> varL ^ 0 = ?
+[ 1 , 0 , 0 ]
+[ 0 , 1 , 0 ]
+[ 0 , 0 , 1 ]
+>
+
+abs(x)
+acos(x)
+asin(x)
+atan(x)
+ceil(x)
+floor(x)
+cosh(x)
+cos(x)
+log(x)
+logt(x)
+tan(x)
+deg(x)
+sinh(x)
